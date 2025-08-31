@@ -284,7 +284,7 @@
     <script src="assets/js/notifications.js"></script>
     
     <!-- User Management Script (no auth.js conflict) -->
-    <script src="assets/js/user-management.js"></script>
+    <script src="assets/js/user-management.js?v=20250831-1"></script>
     
     <script>
         // Authentication check for user management

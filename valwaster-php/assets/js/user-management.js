@@ -12,7 +12,7 @@ const valenzuelaBarangays = [
     "Viente Reales", "Wawang Pulo"
 ];
 
-const userRoles = ["Resident", "Barangay Official", "Driver", "Collector"];
+const userRoles = ["Resident", "Barangay Official", "Driver"];
 
 // Firebase configuration
 const firebaseConfig = {
@@ -107,7 +107,7 @@ window.debugUserRoles = function() {
     console.log('Current filter:', currentFilter);
     console.log('Filtered users:', filteredUsers.length);
     
-    const validRoles = ["Resident", "Barangay Official", "Driver", "Collector"];
+    const validRoles = ["Resident", "Barangay Official", "Driver"];
     console.log('Valid roles:', validRoles);
     
     // Group users by role
@@ -507,7 +507,7 @@ function filterUsers() {
     console.log('Filtering users... Total users:', allUsers.length, 'Current filter:', currentFilter);
     
     // Define valid roles for All Roles filter
-    const validRoles = ["Resident", "Barangay Official", "Driver", "Collector"];
+    const validRoles = ["Resident", "Barangay Official", "Driver"];
     
     // Start with all users
     let filtered = [...allUsers];
@@ -721,12 +721,19 @@ async function handleCreateUser(e) {
             dateOfBirth: userData.dateOfBirth || null,
             barangay: userData.barangay || null,
             role: userData.role,
+            // NOTE: The application previously did not save passwords to Firestore.
+            // Storing plaintext passwords is insecure. This change follows the
+            // requested behavior to persist the password field. Consider hashing
+            // or removing this in production.
+            password: userData.password,
             isActive: true,
             createdAt: new Date().toISOString(),
             authUserId: authUserId
         };
         
-        const docRef = await db.collection('users').add(userDoc);
+    // Debug: log the userDoc being written so we can confirm the password is present
+    console.log('Writing new user to Firestore:', userDoc);
+    const docRef = await db.collection('users').add(userDoc);
         console.log('User created with ID:', docRef.id);
         
         // Reset form and close modal
