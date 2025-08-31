@@ -697,9 +697,19 @@ async function handleCreateUser(e) {
         return;
     }
     
+    // Debug: Log the user data being processed
+    console.log('Processing user creation for:', {
+        name: `${userData.firstName} ${userData.lastName}`,
+        email: userData.email,
+        role: userData.role,
+        barangay: userData.barangay
+    });
+    
     // Prepare submit button state outside try so finally can restore it
     let submitButton = e.target.querySelector('button[type="submit"]');
     let originalText = submitButton ? submitButton.textContent : 'Create User';
+    let authUserId = null;
+    
     try {
         // Show loading state
         if (submitButton) {
@@ -707,13 +717,32 @@ async function handleCreateUser(e) {
             submitButton.disabled = true;
         }
         
-        // Create user in Firebase Auth (optional - for login capability)
-        let authUserId = null;
+        // Create user in Firebase Authentication for ALL roles
+        console.log('Creating user with role:', userData.role, 'Email:', userData.email);
+        console.log('Firebase Auth available:', typeof firebase !== 'undefined' && typeof firebase.auth !== 'undefined');
+        
         try {
-            const userCredential = await createUserWithEmailAndPassword(auth, userData.email, userData.password);
+            console.log('Attempting Firebase Auth creation...');
+            const userCredential = await firebase.auth().createUserWithEmailAndPassword(userData.email, userData.password);
             authUserId = userCredential.user.uid;
+            console.log('✅ SUCCESS: User created in Firebase Auth with UID:', authUserId, 'Role:', userData.role);
+            
+            // Update the user's display name in Firebase Auth
+            await userCredential.user.updateProfile({
+                displayName: `${userData.firstName} ${userData.lastName}`
+            });
+            console.log('✅ SUCCESS: Display name updated for', userData.role, 'user');
+            
         } catch (authError) {
-            console.log('Auth creation skipped (user might be for record only):', authError.message);
+            console.error('❌ FAILED: Firebase Auth creation failed for role:', userData.role);
+            console.error('Auth Error Details:', {
+                code: authError.code,
+                message: authError.message,
+                email: userData.email,
+                role: userData.role
+            });
+            // If auth creation fails, we should not proceed with Firestore creation
+            throw new Error(`Failed to create user account: ${authError.message}`);
         }
         
         // Create user document in Firestore
@@ -724,28 +753,36 @@ async function handleCreateUser(e) {
             dateOfBirth: userData.dateOfBirth || null,
             barangay: userData.barangay || null,
             role: userData.role,
-            // NOTE: The application previously did not save passwords to Firestore.
-            // Storing plaintext passwords is insecure. This change follows the
-            // requested behavior to persist the password field. Consider hashing
-            // or removing this in production.
-            password: userData.password,
             isActive: true,
             createdAt: new Date().toISOString(),
             authUserId: authUserId
         };
         
-    // Debug: log the userDoc being written so we can confirm the password is present
-    console.log('Writing new user to Firestore:', userDoc);
-    const docRef = await db.collection('users').add(userDoc);
-        console.log('User created with ID:', docRef.id);
+        console.log('Creating user document in Firestore:', userDoc);
+        const docRef = await db.collection('users').add(userDoc);
+        console.log('User document created with ID:', docRef.id);
         
         // Reset form and close modal
         createUserForm.reset();
         closeCreateUserModal();
-        showSuccess('User created successfully!');
+        showSuccess('User created successfully in both Authentication and Database!');
         
     } catch (error) {
         console.error('Error creating user:', error);
+        
+        // If Firestore creation failed but Auth succeeded, clean up Auth user
+        if (authUserId && error.message.includes('Firestore')) {
+            try {
+                const user = firebase.auth().currentUser;
+                if (user && user.uid === authUserId) {
+                    await user.delete();
+                    console.log('Cleaned up Auth user after Firestore failure');
+                }
+            } catch (cleanupError) {
+                console.error('Failed to cleanup Auth user:', cleanupError);
+            }
+        }
+        
         showError(error.message || 'Error creating user. Please try again.');
     } finally {
         // Reset button state (safely)
@@ -854,42 +891,53 @@ window.editUser = function(userId) {
 }
 
 window.deleteUser = async function(userId, userName) {
+    const performDelete = async () => {
+        try {
+            // First get the user document to find the authUserId
+            const userDoc = await db.collection('users').doc(userId).get();
+            const userData = userDoc.data();
+            const authUserId = userData?.authUserId;
+            
+            // Delete from Firestore first
+            await db.collection('users').doc(userId).delete();
+            console.log('User deleted from Firestore');
+            
+            // If user has an authUserId, try to delete from Firebase Auth
+            if (authUserId) {
+                try {
+                    // Note: Deleting other users from Firebase Auth requires Admin SDK
+                    // This is a limitation of client-side Firebase Auth
+                    // For now, we'll log this and handle it server-side if needed
+                    console.log('User has authUserId:', authUserId, '- Auth deletion requires server-side implementation');
+                    showSuccess(`User ${userName} deleted from database. Note: Authentication account may need manual cleanup.`);
+                } catch (authError) {
+                    console.error('Could not delete from Firebase Auth (requires Admin SDK):', authError);
+                    showSuccess(`User ${userName} deleted from database. Authentication account requires manual cleanup.`);
+                }
+            } else {
+                showSuccess(`User ${userName} deleted successfully!`);
+            }
+            
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            showError('Error deleting user. Please try again.');
+        }
+    };
+
     // Use modern confirm if available, fallback to browser confirm
     if (window.notifications && window.notifications.confirm) {
         window.notifications.confirm(
             `Are you sure you want to delete ${userName}? This action cannot be undone.`,
-            async () => {
-                try {
-                    await db.collection('users').doc(userId).delete();
-                    showSuccess('User deleted successfully!');
-                } catch (error) {
-                    console.error('Error deleting user:', error);
-                    showError('Error deleting user. Please try again.');
-                }
-            }
+            performDelete
         );
     } else if (typeof window.showConfirm === 'function') {
         window.showConfirm(
             `Are you sure you want to delete ${userName}? This action cannot be undone.`,
-            async () => {
-                try {
-                    await db.collection('users').doc(userId).delete();
-                    showSuccess('User deleted successfully!');
-                } catch (error) {
-                    console.error('Error deleting user:', error);
-                    showError('Error deleting user. Please try again.');
-                }
-            }
+            performDelete
         );
     } else {
         if (confirm(`Are you sure you want to delete ${userName}? This action cannot be undone.`)) {
-            try {
-                await db.collection('users').doc(userId).delete();
-                showSuccess('User deleted successfully!');
-            } catch (error) {
-                console.error('Error deleting user:', error);
-                showError('Error deleting user. Please try again.');
-            }
+            await performDelete();
         }
     }
 }
