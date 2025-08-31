@@ -1,0 +1,1240 @@
+:root {
+  --bar-h: 60px;
+  --sidebar-w: 248px;
+   --radius: 8px;
+
+  --border: #e5e7eb;
+  --content-gray: #EDEDED;
+
+  --green-pill: #04A90C;   /* NAV-ITEM ACTIVE*/
+  --green-brand: #3AC84D;  /* V BACKGROUND */
+  --topbar-bg: #FFFFFF;    /* HEADER COLOR */
+  --chip-bg: #ffffff;      /* FILL BORDER ACCOUNT */
+  --chip-circle: #97FEA6;  /* AVATAR FILL */
+  --signout-bg: #F0F7F3;
+  --signout-br: #e3eee7;
+}
+
+.app-shell {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-rows: var(--bar-h) 1fr;
+  grid-template-areas:
+    "brandbar topbar"
+    "sidebar  content";
+  background:#fff;
+}
+
+.brandbar {
+  grid-area: brandbar;
+  background:#fff;
+  border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+  display:flex; 
+  align-items:center; 
+  padding:0 18px;
+}
+
+.brand { 
+  display:flex; 
+  align-items:center; 
+  gap:10px; 
+}
+
+.brand-circle {
+  width:28px; 
+  height:28px; 
+  border-radius:9999px;
+  background:var(--green-brand); 
+  color:#fff;
+  display:grid; 
+  place-items:center; 
+  font-weight:600;
+  margin-top: 1.45rem;
+}
+
+.brand-name { 
+  font-weight:600; 
+  color:#055409; 
+  margin-top: 1.45rem; 
+  font-size: 1.26rem;
+}
+
+.topbar {
+  grid-area: topbar;
+  background: var(--topbar-bg);
+  border-bottom:1px 
+  solid var(--border);
+  display:flex; 
+  align-items:center; 
+  padding:0 18px;
+}
+
+.page-title { 
+  margin:10; 
+  font-size:18px; 
+  font-weight:500; 
+  color:#111827; 
+}
+
+.hamburger {
+  display:none; 
+  border:0; 
+  background:transparent; 
+  padding:6px;
+  margin-right:10px; 
+  cursor:pointer;
+}
+
+.sidebar {
+  grid-area: sidebar;
+  background:#fff;
+  border-right:1px solid var(--border);
+  display:grid; 
+  grid-template-rows: 1fr auto;
+}
+
+.nav { 
+  display:flex; 
+  flex-direction:column; 
+  gap:12px; 
+  padding:16px; 
+}
+
+.nav-item{
+  display:flex; 
+  align-items:center; 
+  gap:10px;
+  height:44px; 
+  padding:0 14px;
+  border-radius: var(--radius);
+  color:#111827; 
+  text-decoration:none;
+  transition: background .15s, color .15s;
+}
+.nav-item:hover { 
+  background:#f3f4f6; 
+}
+
+.icon-left { 
+  width:20px; 
+  height:20px; 
+  display:grid; 
+  place-items:center; 
+}
+
+.nav-item.active { 
+  background:var(--green-pill); 
+  color:#fff; 
+  font-weight: 400;
+}
+
+.sidebar-footer { 
+  padding:16px; 
+  border-top:1px solid var(--border); 
+}
+
+.account {
+  display:flex; 
+  align-items:center; 
+  gap:12px;
+  background: var(--chip-bg);
+  padding:12px; 
+  border-radius:999px; 
+  margin-bottom:12px;
+}
+
+.account-circle {
+  width:32px; 
+  height:32px; 
+  border-radius:9999px;
+  display:grid; 
+  place-items:center;
+  background: var(--chip-circle);
+  color:#166534;
+}
+
+.account-name { 
+  color:#111827; 
+  font-weight: 600; 
+}
+
+.signout {
+  width:100%; 
+  padding:10px 12px;
+  border:1px solid var(--signout-br);
+  background: var(--signout-bg);
+  border-radius:8px;
+  color:#1f2937; 
+  display:flex; 
+  align-items:center; 
+  gap:8px; font:inherit;
+  cursor: pointer;
+}
+
+.signout:hover{
+  background-color: #efefef;
+}
+
+.signout span {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.icon { 
+  width:16px; 
+  height:16px; 
+}
+
+.content { 
+  grid-area: content; 
+  background: var(--content-gray); 
+  overflow:auto; 
+}
+
+.page-container { 
+  max-width:1160px; 
+  margin:16px auto; 
+  padding:8px 8px 24px; 
+}
+
+.sidebar-mobile-header {  
+  display:none; 
+}
+
+.closebtn { 
+  border:0; 
+  background:transparent; 
+  padding:6px; 
+  cursor:pointer; 
+}
+
+.backdrop {
+  position:fixed; 
+  inset:0; 
+  background:rgba(0,0,0,.35); 
+  z-index:40;
+}
+
+/*RESPONSIVE 1024px*/
+
+@media (max-width: 1024px){
+  /* collapse grid to one column; topbar spans full width */
+  .app-shell{
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--bar-h) 1fr;
+    grid-template-areas:
+      "topbar"
+      "content";
+  }
+  .brandbar{ 
+    display:none; 
+  }
+  .hamburger{ 
+    display:inline-flex; 
+  }
+
+  .sidebar{
+    position:fixed; 
+    top:0; left:0; 
+    bottom:0;
+    width: var(--sidebar-w);
+    background:#fff; 
+    border-right:1px solid var(--border);
+    display:grid; 
+    grid-template-rows: auto 1fr auto;
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+    z-index:50; 
+    box-shadow:0 10px 20px rgba(0,0,0,.15);
+  }
+
+  .sidebar.is-open{ 
+    transform: translateX(0); 
+  }
+
+  .sidebar-mobile-header{
+    display:flex;
+    align-items:center;
+    height: var(--bar-h);
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border);      /* bottom stroke */
+    background:#fff;
+  }
+  .sidebar-mobile-header .brand{
+    display:flex; align-items:center; gap:10px;
+    margin-left: 4px;                              /* small indent */
+  }
+  .sidebar-mobile-header .closebtn{
+    margin-left: auto;                              
+  }
+
+ 
+
+  /* keep nav spacing comfy in drawer */
+  .nav{ padding:12px; gap:10px; }
+
+  /* ensure content is above backdrop click target */
+  .content{ position:relative; z-index:1; }
+}
+
+/* belt-and-suspenders: never show mobile header on desktop */
+@media (min-width: 1025px){
+  .sidebar-mobile-header{ display:none !important; }
+}
+
+/* ========= DASHBOARD UI ADDITIONS (append to file) ========= */
+
+/* light card primitive reused across sections */
+.card{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+}
+
+/* -------- Stats row -------- */
+.stats-grid{
+  display:grid;
+  gap:16px;
+  margin-bottom:16px;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+}
+
+.stats-card{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px;
+}
+
+.stats-meta{display:flex;flex-direction:column;gap:6px}
+.stats-label{margin:0;color:#6b7280;font-weight:600}
+.stats-value{margin:0;font-size:28px}
+.stats-sub{margin:0;color:#6b7280;font-size:12px}
+
+.stats-icon{
+  width:38px;height:38px;border-radius:10px;
+  display:grid;place-items:center;
+  background:#ecfdf5;               /* soft green bg */
+  color:#166534;                     /* matches your chip text */
+}
+
+.delta{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;font-weight:600}
+.delta.down{color:#ef4444}
+.delta.up{color:#16a34a}
+.delta-sub{color:#6b7280;font-weight:500}
+
+/* -------- Main grid: Map + Recent -------- */
+.main-grid{
+  display:grid;
+  gap:16px;
+  grid-template-columns: 1fr 360px;
+}
+
+/* Map panel (UI placeholder) */
+.map-panel{padding:0;overflow:hidden}
+.mapbox-faux{
+  position:relative;
+  height:560px;
+  background:#eaeef3;                /* light gray map background */
+  border-radius:12px;
+}
+.map-overlay{
+  position:absolute;top:12px;left:12px;
+  background:rgba(255,255,255,.92);
+  border:1px solid var(--border);
+  padding:6px 10px;border-radius:8px;
+  font-size:12px;color:#475569
+}
+.map-attrib{
+  position:absolute;right:10px;bottom:8px;
+  font-size:11px;color:#6b7280;
+  background:rgba(255,255,255,.9);
+  padding:4px 6px;border-radius:6px;border:1px solid var(--border)
+}
+
+/* Recent reports panel */
+.recent{display:flex;flex-direction:column;padding:14px}
+.recent-title{margin:4px 2px 12px 2px;font-size:16px}
+.recent-list{display:flex;flex-direction:column;gap:12px;margin-bottom:14px}
+
+.report-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px;border:1px solid var(--border);
+  border-radius:12px;background:#fff
+}
+.report-main{min-width:0}
+.report-title{
+  font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:240px;
+}
+.report-sub{display:flex;align-items:center;gap:6px;color:#64748b;font-size:12px;margin-top:4px}
+.report-date{color:#94a3b8;font-size:12px;margin-top:2px}
+
+.pill{
+  text-transform:capitalize;
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:74px;height:28px;padding:0 10px;border-radius:999px;
+  font-size:12px;font-weight:700;border:1px solid var(--border);
+  background:#eef2ff;color:#1f2937;
+}
+.pill-pending{background:#eff6ff;color:#1e3a8a;border-color:#dbeafe}
+
+/* Button */
+.btn-outline{
+  width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+  background:#fff;cursor:pointer;font-weight:600
+}
+.btn-outline:hover{background:#f9fafb}
+
+/* -------- Responsive tweaks (keeps your 1024 rule) -------- */
+@media (max-width:1024px){
+  .stats-grid{grid-template-columns: repeat(2,minmax(0,1fr));}
+  .main-grid{grid-template-columns: 1fr;}
+  .mapbox-faux{height:440px;}
+}
+@media (max-width:640px){
+  .stats-grid{grid-template-columns:1fr;}
+}
+
+/* Leaflet map sizing */
+.map-panel .leaflet-map,
+.map-panel .leaflet-container{
+  height: 560px;
+  width: 100%;
+  border-radius: 12px;
+}
+@media (max-width:1024px){
+  .map-panel .leaflet-map,
+  .map-panel .leaflet-container{ height: 440px; }
+}
+
+/* ---- Announcement card ---- */
+.annc-card{margin-top:16px;padding:18px}
+.annc-title{margin:6px 0 10px 2px;font-size:20px}
+.annc-body{color:#6b7280;margin:0 2px 14px}
+.annc-actions{max-width:220px}
+
+/* ---- Bottom quick actions (3 cards) ---- */
+.action-grid{
+  display:grid;
+  gap:16px;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  margin-top:16px;
+}
+.action-card{
+  display:flex;align-items:center;gap:14px;
+  padding:16px;
+  cursor:pointer;
+  transition: background .15s ease, border-color .15s ease, transform .05s ease;
+  text-align:left;
+}
+.action-card:hover{background:#f9fafb;border-color:#d1d5db}
+.action-icon{
+  width:46px;height:46px;border-radius:12px;
+  display:grid;place-items:center;font-weight:600;
+}
+.action-title{font-weight:700;margin-bottom:4px}
+.action-desc{color:#6b7280;font-size:13px}
+
+/* color variants */
+.action-green .action-icon{background:#E6F7EC;color:#0e8b3d}
+.action-blue  .action-icon{background:#EFF6FF;color:#1e40af}
+.action-teal  .action-icon{background:#ECFEFF;color:#0e7490}
+
+/* responsive */
+@media (max-width:1024px){
+  .action-grid{grid-template-columns:1fr}
+}
+
+/* ===== Announcement edit UI ===== */
+.annc-card{margin-top:16px;padding:18px}
+.annc-title{margin:6px 0 12px 2px;font-size:22px}
+.annc-body{color:#374151;margin:0 2px 14px}
+.annc-textarea{
+  width:100%;
+  min-height:160px;
+  resize:vertical;
+  padding:16px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:#fff;
+  color:#111827;
+  outline:none;
+}
+.annc-textarea:focus{border-color:#97FEA6; box-shadow:0 0 0 3px rgba(58,200,77,.15)}
+.annc-actions{
+  display:flex; gap:12px; margin-top:14px;
+}
+
+/* Buttons */
+.btn-primary{
+  padding:10px 16px;border-radius:8px;border:1px solid #2fb34a;
+  background: var(--green-brand); color:#fff; font-weight:600; cursor:pointer;
+}
+.btn-primary:hover{filter:brightness(.95)}
+.btn-ghost{
+  padding:10px 16px;border-radius:8px;border:1px solid var(--signout-br);
+  background: #f3fbf6; color:#14532d; font-weight:600; cursor:pointer;
+}
+.btn-ghost:hover{background:#eef8f1}
+
+/* -----------------------------------USER MANAGEMENT----------------------------------------------------- */
+
+/* ===== User Management UI ===== */
+.um-headrow{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:12px;
+}
+.um-title{ margin:0; font-size:28px; font-weight:800; color:#111827; }
+
+/* primary button reused */
+.btn-primary{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 14px; border-radius:8px;
+  border:1px solid #2fb34a; background:var(--green-brand);
+  color:#fff; font-weight:700; cursor:pointer;
+}
+.btn-primary:hover{ filter:brightness(.95); }
+.btn-icon svg{ margin-top:-1px; }
+
+/* toolbar */
+.um-toolbar{
+  display:flex; align-items:center; gap:12px;
+  margin-bottom:12px;
+}
+.um-search{
+  flex:1; position:relative; display:flex; align-items:center;
+  border:1px solid var(--border); background:#fff; border-radius:10px; height:38px;
+  padding:0 10px;
+}
+.um-search svg{ opacity:.55; }
+.um-search input{
+  border:0; outline:none; width:100%; height:100%;
+  padding:0 8px; background:transparent; color:#111827;
+}
+.um-filter{
+  height:38px; display:inline-flex; align-items:center; gap:8px;
+  padding:0 12px; border:1px solid var(--border);
+  background:#fff; border-radius:10px; cursor:pointer; color:#111827;
+}
+
+/* table card */
+.um-table-card{ padding:0; overflow:hidden; }
+.um-table{ width:100%; border-collapse:separate; border-spacing:0; }
+.um-table thead th{
+  text-align:left; font-weight:700; color:#374151; font-size:13px;
+  padding:12px 14px; background:#f7f7f7; border-bottom:1px solid var(--border);
+}
+.um-table tbody td{
+  padding:14px; border-bottom:1px solid var(--border); color:#111827;
+}
+.um-table .col-actions{ width:120px; text-align:right; }
+.um-table .empty td{
+  text-align:center; color:#475569; padding:40px 12px;
+}
+
+/* small screens */
+@media (max-width: 640px){
+  .um-headrow{ flex-direction:column; gap:10px; align-items:stretch; }
+  .um-toolbar{ flex-direction:column; }
+}
+
+/* ===== Create User Modal ===== */
+.um-modal{
+  position:fixed; inset:0; z-index:70;
+  display:grid; place-items:center;
+  background:rgba(0,0,0,.35);
+  padding:20px;
+}
+.um-modal-card{
+  position:relative;
+  width:100%; max-width:640px;
+  background:#f3fbf6;                 /* soft green tint */
+  border:1px solid var(--signout-br);
+  border-radius:14px;
+  box-shadow:0 10px 30px rgba(0,0,0,.18);
+  padding:22px;
+}
+.um-modal-close{
+  position:absolute; top:14px; right:14px;
+  border:0; background:transparent; cursor:pointer; color:#111827;
+}
+.um-modal-title{ margin:0 0 4px; font-size:22px; font-weight:800; }
+.um-modal-sub{ margin:0 0 14px; color:#6b7280; }
+
+/* form */
+.um-form{ display:flex; flex-direction:column; gap:14px; }
+.um-field{ display:flex; flex-direction:column; gap:6px; }
+.um-label{ font-weight:700; color:#111827; }
+.um-input{
+  border:1px solid var(--border);
+  background:#fff; border-radius:10px; height:44px;
+  padding:0 12px; outline:none; color:#111827;
+}
+.um-input:focus{ border-color:#2fb34a; box-shadow:0 0 0 3px rgba(58,200,77,.18); }
+
+/* select */
+.um-select-wrap{ position:relative; }
+.um-select{
+  -webkit-appearance:none; appearance:none;
+  width:100%; height:44px; border-radius:10px;
+  border:1px solid var(--border); background:#fff;
+  padding:0 34px 0 12px; outline:none; color:#111827;
+}
+.um-select:focus{ border-color:#2fb34a; box-shadow:0 0 0 3px rgba(58,200,77,.18); }
+.um-select-caret{ position:absolute; right:10px; top:50%; transform:translateY(-50%); pointer-events:none; color:#111827; opacity:.7; }
+
+.um-modal-actions{ display:flex; gap:12px; justify-content:flex-end; margin-top:8px; }
+
+/* re-use buttons (btn-primary already exists) */
+.btn-ghost{
+  padding:10px 16px;border-radius:8px;border:1px solid var(--signout-br);
+  background:#f3fbf6;color:#14532d;font-weight:600;cursor:pointer;
+}
+.btn-ghost:hover{ background:#eef8f1; }
+
+/* Role filter dropdown — menu matches trigger width */
+.um-filter-wrap{ 
+  position: relative; 
+  display: inline-block;            /* makes 100% below refer to trigger width */
+}
+
+.um-filter{
+  height: 38px;
+  display: inline-flex; 
+  align-items: center; 
+  justify-content: space-between;   /* push caret to the right edge */
+  gap: 8px; 
+  padding: 0 12px; 
+  border: 1px solid var(--border); 
+  background: #f4fbf6; 
+  border-radius: 10px; 
+  cursor: pointer; 
+  color: #0b3b18; 
+  width: 240px
+}
+
+.um-menu{
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;                          /* align to trigger’s left edge */
+  right: auto;
+  min-width: 100%;                  /* 👈 key: at least the same width as trigger */
+  background: #fff; 
+  border: 1px solid var(--border); 
+  border-radius: 12px; 
+  box-shadow: 0 10px 24px rgba(0,0,0,.12); 
+  padding: 6px; 
+  z-index: 60;
+  width: 240px
+}
+
+.um-menu-item{
+  width: 100%; 
+  display: flex; 
+  align-items: center; 
+  gap: 8px; 
+  padding: 10px 12px; 
+  border: 0; 
+  background: #fff; 
+  border-radius: 10px; 
+  cursor: pointer; 
+  text-align: left; 
+  color: #111827; 
+}
+.um-menu-item:hover{ background:#f9fafb; }
+
+.um-check{ opacity: 0; color:#111827; width: 16px; }
+.um-check.show{ opacity: 1; }
+
+/* -----------------------------------------REPORT MANAGEMENT-------------------------------------------------------- */
+
+/* ===== Report Management ===== */
+.btn-soft{
+  height:36px; padding:0 12px;
+  border:1px solid var(--border);
+  background:#f3fbf6; color:#0b3b18;
+  border-radius:10px; font-weight:700; cursor:pointer;
+}
+.btn-soft:hover{ background:#eef8f1; }
+
+.rm-controls{ display:flex; gap:12px; margin-bottom:12px; }
+
+.rm-tabs{ margin-bottom:12px; }
+.rm-seg{
+  display:inline-flex; gap:8px;
+  background:#eeeeee66;             /* light bar behind the pills */
+  border-radius:10px; padding:6px;
+}
+.rm-tab{
+  border:1px solid transparent;      /* avoid layout shift when active */
+  background:#f4fbf6;
+  padding:6px 12px;
+  border-radius:10px;
+  display:inline-flex; align-items:center; gap:8px;
+  font-weight:700; color:#27343a; cursor:pointer;
+}
+.rm-tab.active{
+  background:#fff;
+  border-color:#2fb34a;              /* green outline for active tab */
+  box-shadow:0 1px 2px rgba(16,24,40,.06);
+}
+.count-dot{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:22px; height:22px; padding:0 6px;
+  border-radius:999px; font-size:12px; font-weight:700;
+}
+.count-green{ background:rgba(22,163,74,.12); color:#166534; }
+.count-red{   background:rgba(239,68,68,.12); color:#991b1b; }
+.count-gray{  background:#e5e7eb; color:#374151; }
+
+.rm-panel{ padding:16px; }
+.rm-title{ margin:6px 2px 4px; font-size:24px; font-weight:800; }
+.rm-sub{ color:#6b7280; margin:0 2px 14px; }
+
+.rm-row{
+  display:flex; gap:12px; align-items:center; justify-content:space-between;
+  margin-bottom:12px;
+}
+.rm-search{
+  flex:1; display:flex; align-items:center; gap:8px;
+  border:1px solid var(--border); background:#fff; border-radius:10px; height:38px;
+  padding:0 10px;
+}
+.rm-search svg{ opacity:.55; }
+.rm-search input{
+  border:0; outline:none; width:100%; height:100%;
+  padding:0 8px; background:transparent; color:#111827;
+}
+.rm-filters{ display:flex; gap:10px; }
+
+/* reuse role dropdown styles (.um-filter, .um-menu, etc.) already in your CSS */
+
+/* responsive */
+@media (max-width: 640px){
+  .rm-row{ flex-direction:column; align-items:stretch; }
+  .rm-filters{ justify-content:space-between; }
+}
+
+/* -----------------------------------------TRUCK SCHEDULE----------------------------------------------------------*/
+
+/* ===== Truck Schedule ===== */
+.sched-topbar{ display:flex; justify-content:flex-start; margin-bottom:12px; }
+
+.sched-card{ padding:16px; }
+.sched-head{
+  display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+  margin-bottom:10px;
+}
+.sched-title{ margin:2px 0 2px; font-size:22px; font-weight:800; }
+.sched-sub{ margin:0; color:#6b7280; }
+
+.sched-monthrow{
+  display:flex; align-items:center; justify-content:space-between; margin:6px 2px 10px;
+}
+.sched-month{ margin:0; font-size:20px; font-weight:800; }
+.sched-nav{ display:flex; gap:8px; }
+
+/* buttons */
+.btn-soft{ height:32px; padding:0 12px; border:1px solid var(--border); background:#f3fbf6; color:#0b3b18; border-radius:10px; font-weight:700; cursor:pointer; }
+.btn-soft:hover{ background:#eef8f1; }
+.btn-soft-mini{ height:28px; padding:0 10px; border:1px solid var(--border); background:#f9fafb; border-radius:8px; cursor:pointer; }
+.btn-ghost-mini{ height:28px; padding:0 10px; border:1px solid var(--border); background:#fff; border-radius:8px; cursor:pointer; }
+
+/* calendar grid */
+.cal-grid{
+  display:grid; grid-template-columns: repeat(7, 1fr); gap:12px;
+}
+.cal-dow{ margin-bottom:8px; }
+.cal-dow-cell{
+  padding:8px 6px; color:#6b7280; font-weight:700; text-align:left;
+}
+
+.cal-cell{
+  background:#f8f8f8;
+  border:1px solid var(--border);
+  border-radius:10px;
+  min-height:110px;
+  position:relative;
+}
+.cal-cell.is-empty{ background:#fafafa; }
+.cal-cell.is-today{ box-shadow:0 0 0 2px #34c759 inset; border-color:#2fb34a; }
+
+.cal-daynum{
+  position:absolute; top:8px; left:10px;
+  font-weight:700; color:#111827;
+}
+.cal-cell.is-today .cal-daynum span{
+  display:inline-grid; place-items:center;
+  width:26px; height:26px; border-radius:999px;
+  border:2px solid #2fb34a;
+  color:#0b3b18; font-weight:800;
+}
+
+.cal-add{
+  position:absolute; top:8px; right:8px;
+  width:22px; height:22px; border-radius:6px;
+  border:1px solid var(--border); background:#fff; cursor:pointer;
+  line-height:20px; font-weight:700;
+}
+.cal-add:hover{ background:#f3fbf6; }
+
+/* responsive */
+@media (max-width: 900px){
+  .cal-cell{ min-height:90px; }
+}
+@media (max-width: 640px){
+  .sched-head{ flex-direction:column; align-items:flex-start; }
+  .sched-monthrow{ flex-direction:column; gap:10px; align-items:flex-start; }
+  .cal-grid{ gap:8px; }
+  .cal-cell{ min-height:80px; }
+}
+
+/* Month dropdown polish */
+.month-dd { width: 140px; }                    /* slightly wider trigger */
+.month-dd .um-menu{
+  width: 100%;
+  box-sizing: border-box;                       /* match trigger width exactly */
+  max-height: 260px;                            /* avoid “super tall” popover */
+  overflow: auto;                               /* scroll inside the menu */
+}
+.month-dd .um-menu-item{ padding: 8px 12px; line-height: 1.25; }
+.month-dd .um-menu-item.active{ background:#f3fbf6; font-weight:700; }
+
+/* Keep the Month button compact and prevent clipping */
+.sched-card{ position: relative; overflow: visible; }   /* let popovers overflow the card */
+
+.month-dd{ width: 140px; position: relative; z-index: 5; }
+.month-dd .um-filter{ width: 100%; }                    /* fill the 140px wrapper, not the whole row */
+
+/* Menu: align to the right edge of the trigger, match width, and scroll if tall */
+.month-dd-menu{
+  right: 0; left: auto;                 /* anchor to right so it won't spill off edge */
+  width: 100%;                           /* exactly the trigger width */
+  box-sizing: border-box;
+  max-height: 260px; overflow: auto;
+  z-index: 999;                          /* above rounded card corners */
+}
+
+/* Nice highlight for current month */
+.month-dd .um-menu-item.active{ background:#f3fbf6; font-weight:700; }
+
+/* ===== Schedule modal (scoped to avoid touching others) ===== */
+.sched-modal{ position:fixed; inset:0; background:rgba(0,0,0,.35);
+  display:flex; align-items:center; justify-content:center; padding:24px; z-index:100; }
+
+.sched-modal-card{ max-width:760px; width:100%; background:#f5fbf6; border-radius:12px;
+  box-shadow:0 12px 32px rgba(0,0,0,.18); display:flex; flex-direction:column;
+  max-height:92vh; overflow:hidden; }
+
+/* The form scrolls */
+.sched-modal-scroll{ overflow:auto; padding-right:8px; }
+
+/* Footer stays visible; not sticky, just outside the scroll area */
+.sched-modal-actions{ flex-shrink:0; display:flex; gap:8px; justify-content:flex-end;
+  padding:12px 16px; border-top:1px solid var(--border); background:#f5fbf6; }
+
+@media (max-width:640px){
+  .sched-modal{ padding:12px; }
+  .sched-modal-card{ max-height:94vh; }
+}
+
+/* ---------------------------------------------------------------ATTENDANCE--------------------------------------*/
+
+/* ===== Attendance (scoped) ===== */
+.att-pagehead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.att-h2{font-size:22px;font-weight:700;color:#0b3b18;margin:0}
+.att-sub{color:#667085;margin-top:4px}
+.att-ctas{display:flex;gap:10px}
+.att-ctas .btn-soft, .att-ctas .btn-primary{display:inline-flex;align-items:center;gap:8px}
+
+/* card title/sub */
+.att-card{margin-top:8px}
+.att-title{font-size:18px;font-weight:700;color:#0f172a;margin:4px 0 2px}
+.att-sub2{color:#6b7280;margin:0 0 12px}
+
+/* table bits */
+.att-table .w-driver{width:360px}
+.att-caret{border:0;background:transparent;padding:4px;margin-right:6px;cursor:pointer}
+.att-driver{display:inline-flex;align-items:center;gap:10px}
+.att-avatar{width:28px;height:28px;border-radius:9999px;background:#ebfbea;color:#0b3b18;display:grid;place-items:center}
+.att-avatar.sm{width:22px;height:22px}
+.att-driver-meta{display:flex;align-items:center;gap:8px}
+.att-driver-name{font-weight:600;color:#111827}
+.att-role-pill{font-size:12px;background:#eef2ff;color:#3730a3;border-radius:999px;padding:2px 8px}
+.att-center{display:flex;align-items:center;gap:6px}
+.att-teamcount{font-weight:600}
+.att-mono{white-space:nowrap;color:#111827;display:flex;align-items:center;gap:6px}
+.att-actions{display:flex;gap:8px;justify-content:flex-end}
+.btn-soft-sm{border:1px solid var(--border);background:#f9fafb;border-radius:8px;padding:6px 10px;cursor:pointer}
+.btn-primary-sm{border:0;background:#16a34a;color:#fff;border-radius:8px;padding:6px 12px;cursor:pointer}
+
+/* status badges */
+.att-badge{font-size:12px;border-radius:999px;padding:4px 8px;display:inline-flex;align-items:center}
+.att-badge-amber{background:#fff7ed;color:#a16207;border:1px solid #fde68a}
+.att-badge-green{background:#ecfdf5;color:#166534;border:1px solid #bbf7d0}
+.att-badge-gray{background:#f3f4f6;color:#374151;border:1px solid #e5e7eb}
+
+/* expanded row */
+.att-expand td{background:#fafafa}
+.att-expand-box{padding:10px 8px 14px;border-left:3px solid #e2e8f0}
+.att-expand-title{font-weight:600;color:#111827;margin-bottom:6px}
+.att-members{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;list-style:none;padding:0;margin:0}
+.att-members li{display:flex;align-items:center;gap:8px}
+.att-member-name{font-weight:500}
+.att-role-chip{font-size:12px;background:#eef2ff;color:#3730a3;border-radius:999px;padding:2px 8px}
+
+/* === Attendance polish (compact + alignment) === */
+.att-card .um-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.att-card .um-table th,
+.att-card .um-table td {
+  padding: 10px 12px;           /* tighter rows */
+  vertical-align: middle;       /* center content */
+  font-size: 14px;
+}
+
+.att-card .um-table thead th {
+  color: #334155;
+  font-weight: 600;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.att-card .um-table tbody tr + tr td {
+  border-top: 1px solid #f0f2f4; /* subtle row separator */
+}
+
+/* Column widths to stop wrap/shift */
+.att-table .w-driver { width: 360px; }
+.att-table .col-actions { width: 180px; }
+.att-center svg { min-width: 16px; }
+
+/* Keep times & pills on one line and centered nicely */
+.att-mono { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.att-center { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Driver cell compactness */
+.att-avatar { width: 26px; height: 26px; }
+.att-driver-meta { gap: 6px; }
+.att-driver-name { font-weight: 600; }
+
+/* Caret button (no visual weight) */
+.att-caret { padding: 0 6px; margin-right: 6px; color: #64748b; }
+.att-caret:hover { color: #0f172a; }
+
+/* Badges—smaller & consistent */
+.att-badge { padding: 3px 10px; font-size: 12px; font-weight: 600; line-height: 1; }
+.att-badge-amber { background:#fff7ed; color:#a16207; border:1px solid #fde68a; }
+.att-badge-green { background:#ecfdf5; color:#166534; border:1px solid #bbf7d0; }
+.att-badge-gray  { background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; }
+
+/* Action buttons compact */
+.btn-soft-sm, .btn-primary-sm { height: 32px; padding: 0 12px; }
+.btn-soft-sm  { background:#fff; }
+.btn-primary-sm { background:#16a34a; color:#fff; }
+
+/* Hover row feedback (very subtle) */
+.att-card .um-table tbody tr:hover td { background:#fbfbfc; }
+
+/* Tabs spacing/weight (if they looked heavy) */
+.rm-seg { gap: 8px; }
+.rm-tab { height: 36px; padding: 0 12px; }
+.rm-tab.active { box-shadow: inset 0 0 0 1px #d1fae5; }
+.count-dot { transform: translateY(-1px); }
+
+/* Attendance: lock the table layout + columns */
+.att-card .um-table{ table-layout: fixed; width:100%; }
+
+/* Explicit column widths must match the <colgroup> below */
+.att-table .col-driver  { width:34%; }
+.att-table .col-team    { width:10%; }
+.att-table .col-in      { width:18%; }
+.att-table .col-out     { width:18%; }
+.att-table .col-status  { width:12%; }
+.att-table .col-actions { width:8%; }
+
+/* Keep content single-line and centered nicely */
+.att-cell { display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
+.att-badge { display:inline-block; }               /* pills don’t stretch */
+.att-table td { overflow:hidden; text-overflow:ellipsis; }
+
+/* Row rhythm and separators (closer to your ref) */
+.att-card .um-table th, .att-card .um-table td { padding:12px 14px; vertical-align:middle; }
+.att-card .um-table thead th { border-bottom:1px solid #e5e7eb; color:#475569; font-weight:600; }
+.att-card .um-table tbody tr + tr td { border-top:1px solid #f1f5f9; }
+
+/* Actions align left like the reference */
+.att-actions { justify-content:flex-start; gap:10px; }
+
+/* --- Attendance: fix Actions clipping + column widths --- */
+
+/* Stop clipping cell content (especially the Actions buttons) */
+.att-card .um-table td {
+  overflow: visible;            /* was hidden */
+  text-overflow: clip;          /* no ellipsis here */
+}
+
+/* If you still want truncation, do it only on specific columns (not Actions) */
+.att-table td:nth-child(1),     /* Driver */
+.att-table td:nth-child(3),     /* Check-In */
+.att-table td:nth-child(4) {    /* Check-Out */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Give Actions column enough room for both buttons */
+.att-table .col-actions { width: 220px; }   /* bump from 180px; use 240px if needed */
+
+/* Keep buttons visible and aligned like the reference */
+.att-actions { justify-content: flex-start; gap: 10px; flex-wrap: nowrap; }
+
+/* Attendance header CTAs — make both buttons the same size */
+.att-ctas .btn-soft,
+.att-ctas .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  height: 44px;           /* <- same fixed height */
+  padding: 0 18px;        /* <- same horizontal padding */
+  border-radius: 12px;    /* <- same radius */
+  line-height: 1;         /* <- no extra vertical space */
+  font-weight: 600;
+  box-sizing: border-box; /* include borders in the height */
+}
+
+/* Optional: give the filled button a 1px border so both have identical box-model */
+.att-ctas .btn-primary { border: 1px solid #16a34a; }
+
+/* Icon sizing/spacing */
+.att-ctas .btn-soft svg,
+.att-ctas .btn-primary svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* Attendance section header (title + subtitle) */
+.att-card .att-head { margin-bottom: 12px; }
+
+.att-card .att-title {
+  margin: 0;                 /* remove default margins */
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* If you use <p> right after the title without the class, this catches it too */
+.att-card .att-sub2,
+.att-card .att-title + p {
+  margin: 6px 0 14px;        /* space away from the title */
+  color: #64748b;            /* muted gray */
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+/* Attendance card header: add a left gutter so it doesn't look cramped */
+.att-card .att-title,
+.att-card .att-sub2 {
+  padding-left: 18px;         /* tweak 16–20px to taste */
+}
+
+.att-card .att-sub2 {
+  padding-bottom: 8px;        /* a little breathing room under the subhead */
+}
+
+/* keep the table slightly separated from the header */
+.att-card .um-table-card {
+  margin-top: 6px;
+}
+
+/* Nudge the attendance card header down a little */
+.att-card { 
+  padding-top: 10px;            /* adjust 8–14px to taste */
+}
+
+/* keep the left gutter we added earlier */
+.att-card .att-title,
+.att-card .att-sub2 {
+  padding-left: 18px;
+}
+
+/* a touch more air under the subhead */
+.att-card .att-sub2 {
+  padding-bottom: 10px;
+}
+
+/* Center the Actions column */
+.att-card .um-table th.col-actions { 
+  text-align: center; 
+}
+
+/* Center the buttons inside Actions cells */
+.att-actions{
+  display: flex;            /* already flex in your CSS */
+  justify-content: center;  /* <-- center horizontally */
+  gap: 10px;
+}
+
+/* Optional: on smaller screens, fall back to left-align */
+@media (max-width: 1024px){
+  .att-card .um-table th.col-actions { text-align: left; }
+  .att-actions{ justify-content: flex-start; }
+}
+
+/* Give the caret a fixed width so all rows align consistently */
+.att-caret{
+  display:inline-grid;
+  place-items:center;
+  width: 28px;            /* 16px icon + ~12px padding; keep in sync with your padding */
+  padding: 0 6px;
+  margin-right: 6px;
+}
+
+/* Align the "Driver" header with the avatar (skip caret space) */
+.att-card .um-table thead th:first-child{
+  padding-left: 42px;     /* ≈ caret width (28) + margin (6) + a little buffer */
+}
+
+/* If you used a different caret width, tweak this value up/down a few px */
+
+/* Expanded row (two columns like the mock) */
+.att-expand { background:#fafafa; }
+.att-expand-grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:24px;
+  padding:14px 12px 16px;
+  border-left:3px solid #e2e8f0;
+}
+@media (max-width: 900px){
+  .att-expand-grid{ grid-template-columns: 1fr; }
+}
+
+.att-expand-title{ font-weight:600; color:#111827; margin-bottom:10px; }
+
+.att-member-list{
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.att-member-row{ display:flex; align-items:center; gap:12px; }
+.att-member-name{ font-weight:500; color:#111827; }
+
+/* Role chips */
+.att-chip{
+  font-size:12px; font-weight:600;
+  border-radius:999px; padding:6px 10px;
+  border:1px solid #e5e7eb; background:#fff; color:#111827;
+}
+.att-chip-collector{ background:#ecfdf5; color:#166534; border-color:#bbf7d0; }
+.att-chip-palero{ background:#fff7ed; color:#a16207; border-color:#fde68a; }
+
+/* Key/value on the right */
+.att-kv{ display:flex; gap:8px; align-items:baseline; margin:2px 0 10px; }
+.att-k{ font-weight:700; color:#111827; }
+.att-v{ color:#111827; }
+.att-note{ color:#111827; }
+
+/* Attendance modal — polished Verify/Reject */
+.um-modal .att-actions-row {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.um-modal .att-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition: transform .08s ease, box-shadow .2s ease, background .2s ease, color .2s ease, border-color .2s ease;
+}
+
+/* Reject: outlined with subtle green hint */
+.um-modal .att-reject {
+  background: linear-gradient(#ffffff, #fafafa);
+  color: #0f172a;
+  border: 2px solid #16a34a;
+  box-shadow: 0 1px 0 rgba(0,0,0,.02), inset 0 -1px 0 rgba(0,0,0,.02);
+}
+.um-modal .att-reject:hover { background:#f3fff6; }
+.um-modal .att-reject:active { background:#ebfff0; transform:translateY(0); }
+.um-modal .att-reject:focus-visible { outline:none; box-shadow:0 0 0 3px #bbf7d0; }
+
+/* Verify: bold, elevated */
+.um-modal .att-verify {
+  background:#16a34a;
+  color:#fff;
+  border:1px solid #128a3e;
+  box-shadow:0 6px 16px rgba(22,163,74,.24), inset 0 -2px 0 rgba(0,0,0,.08);
+}
+.um-modal .att-verify:hover   { transform:translateY(-1px); box-shadow:0 10px 22px rgba(22,163,74,.30), inset 0 -2px 0 rgba(0,0,0,.08); }
+.um-modal .att-verify:active  { transform:translateY(0);    box-shadow:0 6px 14px rgba(22,163,74,.22); }
+.um-modal .att-verify:focus-visible { outline:none; box-shadow:0 0 0 3px #86efac; }
+
+/* ===== Check-In modal (scoped) ===== */
+.um-modal .checkin-seg{
+  display:grid; grid-template-columns:1fr 1fr; gap:10px;
+}
+.um-modal .checkin-seg .seg{
+  height:44px; border-radius:12px; border:1.5px solid #e5efe7;
+  background:#f6fbf7; color:#1f5130; font-weight:700; cursor:pointer;
+}
+.um-modal .checkin-seg .seg.active{
+  background:#fff; border-color:#16a34a; box-shadow:0 0 0 3px #ecfdf5 inset;
+}
+
+.um-modal .checkin-row{ display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
+.um-modal .checkin-plus{
+  width:48px; height:44px; border-radius:12px; border:0; cursor:pointer;
+  background:#86efac; color:#065f46; display:grid; place-items:center;
+}
+.um-modal .checkin-empty{ color:#6b7280; margin-top:6px; }
+.um-modal .checkin-chips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.um-modal .checkin-chip{
+  display:inline-flex; align-items:center; gap:6px;
+  background:#f1f5f9; border:1px solid var(--border); border-radius:9999px;
+  padding:6px 10px; color:#111827;
+}
+.um-modal .checkin-chip .x{ border:0; background:transparent; color:#64748b; cursor:pointer }
+
+/* Capture button */
+.um-modal .checkin-photo-btn{
+  display:inline-flex; align-items:center; gap:8px; height:44px; padding:0 16px;
+  border-radius:12px; border:0; background:#16a34a; color:#fff; cursor:pointer;
+}
+.um-modal .checkin-photo-btn:hover{ background:#148c3f; }
+
+/* Fancy verify/reject in details modal (from earlier) */
+.um-modal .att-actions-row{ display:flex; gap:12px; justify-content:flex-end; }
+.um-modal .att-cta{ display:inline-flex; align-items:center; gap:8px; height:42px; padding:0 18px; border-radius:14px; font-weight:700; border:1.5px solid transparent; }
+.um-modal .att-verify{ background:#22c55e; border-color:#16a34a; color:#fff; }
+.um-modal .att-verify:hover{ background:#16a34a; }
+.um-modal .att-reject{ background:#fff; color:#7f1d1d; border-color:#ef4444; }
+.um-modal .att-reject:hover{ background:#fef2f2; border-color:#dc2626; }
+
+/* Center "Capture Team Photo" inside the button */
+.um-modal .checkin-photo-btn{
+  width: 100%;
+  display: flex;             /* override inline-flex */
+  justify-content: center;   /* center icon + text horizontally */
+  align-items: center;       /* already there, but explicit */
+}
