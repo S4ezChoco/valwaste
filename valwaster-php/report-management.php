@@ -30,10 +30,6 @@
 
         <main class="content">
             <div class="page-container">
-                <!-- Top controls -->
-                <div class="rm-controls">
-                    <button type="button" class="btn-soft" onclick="refreshReports()">Refresh Reports</button>
-                </div>
 
                 <!-- Tabs -->
                 <div class="rm-tabs">
@@ -131,7 +127,16 @@
                                     <th>Priority</th>
                                     <th>Category</th>
                                     <th>Date</th>
-                                    <th class="col-actions">Actions</th>
+                                    <th class="col-actions">
+                                        Actions
+                                        <button class="refresh-icon-btn" onclick="refreshReports()" title="Refresh Reports">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="23 4 23 10 17 10"></polyline>
+                                                <polyline points="1 20 1 14 7 14"></polyline>
+                                                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+                                            </svg>
+                                        </button>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody id="reports-tbody">
@@ -144,6 +149,79 @@
                 </section>
             </div>
         </main>
+    </div>
+
+    <!-- Report Details Modal -->
+    <div id="reportDetailsModal" class="um-modal" style="display: none;" onclick="closeModal(event, 'reportDetailsModal')">
+        <div class="um-modal-card large" role="dialog" aria-modal="true">
+            <button class="um-modal-close" aria-label="Close" onclick="closeReportDetailsModal()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+
+            <h3 class="um-modal-title" id="modal-report-title">Report Details</h3>
+            <p class="um-modal-sub">Complete information about this report</p>
+
+            <div class="report-details-content">
+                <div class="report-details-grid">
+                    <div class="report-details-left">
+                        <div class="detail-section">
+                            <h4 class="detail-label">Report Information</h4>
+                            <div class="detail-item">
+                                <span class="detail-key">Title:</span>
+                                <span class="detail-value" id="detail-title">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-key">Location:</span>
+                                <span class="detail-value" id="detail-location">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-key">Reported By:</span>
+                                <span class="detail-value" id="detail-reporter">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-key">Date Reported:</span>
+                                <span class="detail-value" id="detail-date">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-key">Priority:</span>
+                                <span class="detail-value" id="detail-priority">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-key">Category:</span>
+                                <span class="detail-value" id="detail-category">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-key">Status:</span>
+                                <span class="detail-value" id="detail-status">-</span>
+                            </div>
+                        </div>
+
+                        <div class="detail-section">
+                            <h4 class="detail-label">Description</h4>
+                            <div class="detail-description" id="detail-description">
+                                No description provided.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="report-details-right">
+                        <div class="detail-section">
+                            <h4 class="detail-label">Attached Images</h4>
+                            <div class="report-images" id="report-images">
+                                <div class="no-images">No images attached</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="um-modal-actions report-actions" id="report-modal-actions">
+                    <!-- Actions will be populated based on report status -->
+                </div>
+            </div>
+        </div>
     </div>
 
     <script type="module" src="assets/js/auth.js"></script>

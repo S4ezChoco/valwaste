@@ -45,8 +45,8 @@
                         </button>
                         <button class="btn-primary" onclick="openCheckInModal()">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="m9 12 2 2 4-4"></path>
-                                <path d="M21 12c.552 0 1-.448 1-1V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v6c0 .552.448 1 1 1"></path>
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12,6 12,12 16,14"></polyline>
                             </svg>
                             Record Check-In
                         </button>

@@ -30,7 +30,10 @@ const sampleReports = {
             reportedBy: 'Juan Dela Cruz',
             priority: 'High',
             category: 'Missed Collection',
-            date: '2024-01-15'
+            date: '2024-01-15',
+            status: 'Pending',
+            description: 'The garbage truck did not arrive at the scheduled time. Residents are complaining about the accumulating waste in the area.',
+            images: ['https://via.placeholder.com/300x300/ff6b6b/ffffff?text=Garbage+Overflow', 'https://via.placeholder.com/300x300/4ecdc4/ffffff?text=Street+View']
         },
         {
             id: 2,
@@ -39,11 +42,52 @@ const sampleReports = {
             reportedBy: 'Maria Santos',
             priority: 'Medium',
             category: 'Illegal Dumping',
-            date: '2024-01-14'
+            date: '2024-01-14',
+            status: 'Pending',
+            description: 'Someone has been dumping construction waste near the children\'s playground. This poses a safety hazard.',
+            images: ['https://via.placeholder.com/300x300/45b7d1/ffffff?text=Illegal+Dump']
+        },
+        {
+            id: 3,
+            title: 'Broken waste bin',
+            location: 'Barangay Gen. T. de Leon',
+            reportedBy: 'Pedro Martinez',
+            priority: 'Low',
+            category: 'Complaint',
+            date: '2024-01-13',
+            status: 'Pending',
+            description: 'The public waste bin on Main Street is damaged and needs replacement.',
+            images: []
         }
     ],
-    resolved: [],
-    unresolved: []
+    resolved: [
+        {
+            id: 4,
+            title: 'Overflowing dumpster',
+            location: 'Barangay Paso de Blas',
+            reportedBy: 'Ana Reyes',
+            priority: 'High',
+            category: 'Missed Collection',
+            date: '2024-01-10',
+            status: 'Resolved',
+            description: 'Dumpster was overflowing for several days. Issue has been resolved.',
+            images: ['https://via.placeholder.com/300x300/95e1d3/ffffff?text=Fixed+Dumpster']
+        }
+    ],
+    unresolved: [
+        {
+            id: 5,
+            title: 'Persistent odor issue',
+            location: 'Barangay Arkong Bato',
+            reportedBy: 'Roberto Cruz',
+            priority: 'Medium',
+            category: 'Other',
+            date: '2024-01-08',
+            status: 'Unresolved',
+            description: 'Strong odor persists despite multiple attempts to resolve. May require specialized treatment.',
+            images: []
+        }
+    ]
 };
 
 // Initialize on page load
@@ -215,7 +259,7 @@ function displayReports() {
                 <td class="col-actions">
                     <div class="action-buttons">
                         <button class="btn-view" onclick="viewReport(${report.id})">View</button>
-                        ${currentTab === 'pending' ? `<button class="btn-resolve" onclick="resolveReport(${report.id})">Resolve</button>` : ''}
+                        ${getActionButtons(report, currentTab)}
                     </div>
                 </td>
             </tr>
@@ -233,14 +277,180 @@ function formatDate(dateString) {
     });
 }
 
+// Get action buttons based on report status and current tab
+function getActionButtons(report, tab) {
+    if (tab === 'pending') {
+        return `<button class="btn-resolve" onclick="resolveReport(${report.id})">Resolve</button>
+                <button class="btn-unresolve" onclick="unresolveReport(${report.id})">Mark Unresolved</button>`;
+    } else if (tab === 'resolved') {
+        return `<button class="btn-unresolve" onclick="unresolveReport(${report.id})">Mark Unresolved</button>`;
+    } else if (tab === 'unresolved') {
+        return `<button class="btn-resolve" onclick="resolveReport(${report.id})">Mark Resolved</button>`;
+    }
+    return '';
+}
+
+// Find report by ID across all tabs
+function findReportById(reportId) {
+    for (const tab in sampleReports) {
+        const report = sampleReports[tab].find(r => r.id === reportId);
+        if (report) {
+            return { report, currentTab: tab };
+        }
+    }
+    return null;
+}
+
 // View report details
 function viewReport(reportId) {
-    console.log('Viewing report:', reportId);
-    // In a real application, this would open a modal or navigate to a detail page
+    const result = findReportById(reportId);
+    if (!result) {
+        console.error('Report not found:', reportId);
+        return;
+    }
+    
+    const { report } = result;
+    
+    // Populate modal with report data
+    document.getElementById('modal-report-title').textContent = report.title;
+    document.getElementById('detail-title').textContent = report.title;
+    document.getElementById('detail-location').textContent = report.location;
+    document.getElementById('detail-reporter').textContent = report.reportedBy;
+    document.getElementById('detail-date').textContent = formatDate(report.date);
+    document.getElementById('detail-priority').innerHTML = `<span class="priority-badge priority-${report.priority.toLowerCase()}">${report.priority}</span>`;
+    document.getElementById('detail-category').innerHTML = `<span class="category-badge">${report.category}</span>`;
+    document.getElementById('detail-status').textContent = report.status;
+    document.getElementById('detail-description').textContent = report.description || 'No description provided.';
+    
+    // Populate images
+    const imagesContainer = document.getElementById('report-images');
+    if (report.images && report.images.length > 0) {
+        imagesContainer.innerHTML = report.images.map(imageUrl => `
+            <div class="report-image">
+                <img src="${imageUrl}" alt="Report image" onclick="openImageModal('${imageUrl}')">
+            </div>
+        `).join('');
+    } else {
+        imagesContainer.innerHTML = '<div class="no-images">No images attached</div>';
+    }
+    
+    // Populate action buttons
+    const actionsContainer = document.getElementById('report-modal-actions');
+    const actionButtons = getModalActionButtons(report);
+    actionsContainer.innerHTML = `
+        <button type="button" class="btn-ghost" onclick="closeReportDetailsModal()">Close</button>
+        ${actionButtons}
+    `;
+    
+    // Show modal
+    document.getElementById('reportDetailsModal').style.display = 'flex';
+}
+
+// Get action buttons for modal
+function getModalActionButtons(report) {
+    if (report.status === 'Pending') {
+        return `
+            <button type="button" class="btn-primary" onclick="resolveReportFromModal(${report.id})">Mark as Resolved</button>
+            <button type="button" class="btn-unresolve" onclick="unresolveReportFromModal(${report.id})">Mark as Unresolved</button>
+        `;
+    } else if (report.status === 'Resolved') {
+        return `<button type="button" class="btn-unresolve" onclick="unresolveReportFromModal(${report.id})">Mark as Unresolved</button>`;
+    } else if (report.status === 'Unresolved') {
+        return `<button type="button" class="btn-primary" onclick="resolveReportFromModal(${report.id})">Mark as Resolved</button>`;
+    }
+    return '';
+}
+
+// Close report details modal
+function closeReportDetailsModal() {
+    document.getElementById('reportDetailsModal').style.display = 'none';
+}
+
+// Close modal when clicking outside
+function closeModal(event, modalId) {
+    if (event.target.id === modalId) {
+        document.getElementById(modalId).style.display = 'none';
+    }
+}
+
+// Open image in larger view (placeholder function)
+function openImageModal(imageUrl) {
+    // Create a simple image overlay
+    const overlay = document.createElement('div');
+    const rmStyles = `
+    .rm-panel { padding: 20px; }
+    .rm-title { margin: 0 0 6px; font-size: 20px; font-weight: 700; }
+    .rm-sub { margin: 0 0 16px; color: #6b7280; }
+    .rm-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .rm-search { position: relative; flex: 1; max-width: 320px; }
+    .rm-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #9ca3af; }
+    .rm-search input { width: 100%; height: 38px; padding: 0 12px 0 40px; border: 1px solid #e5e7eb; border-radius: 8px; outline: none; }
+    .rm-filters { display: flex; gap: 12px; }
+    `;
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = rmStyles;
+    document.head.appendChild(styleSheet);
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.8); display: flex; align-items: center;
+        justify-content: center; z-index: 10000; cursor: pointer;
+    `;
+    
+    const img = document.createElement('img');
+    img.src = imageUrl;
+    img.style.cssText = 'max-width: 90%; max-height: 90%; border-radius: 8px;';
+    
+    overlay.appendChild(img);
+    overlay.onclick = () => document.body.removeChild(overlay);
+    document.body.appendChild(overlay);
 }
 
 // Resolve report
 function resolveReport(reportId) {
-    console.log('Resolving report:', reportId);
-    // In a real application, this would update the report status
+    moveReport(reportId, 'resolved');
+}
+
+// Resolve report from modal
+function resolveReportFromModal(reportId) {
+    moveReport(reportId, 'resolved');
+    closeReportDetailsModal();
+}
+
+// Unresolve report
+function unresolveReport(reportId) {
+    moveReport(reportId, 'unresolved');
+}
+
+// Unresolve report from modal
+function unresolveReportFromModal(reportId) {
+    moveReport(reportId, 'unresolved');
+    closeReportDetailsModal();
+}
+
+// Move report between tabs
+function moveReport(reportId, targetStatus) {
+    const result = findReportById(reportId);
+    if (!result) {
+        console.error('Report not found:', reportId);
+        return;
+    }
+    
+    const { report, currentTab } = result;
+    
+    // Remove from current tab
+    const currentIndex = sampleReports[currentTab].findIndex(r => r.id === reportId);
+    if (currentIndex > -1) {
+        sampleReports[currentTab].splice(currentIndex, 1);
+    }
+    
+    // Update status and add to target tab
+    report.status = targetStatus.charAt(0).toUpperCase() + targetStatus.slice(1);
+    sampleReports[targetStatus].push(report);
+    
+    // Update UI
+    updateReportCounts();
+    displayReports();
+    
+    // Show success message
+    console.log(`Report ${reportId} moved to ${targetStatus}`);
 }

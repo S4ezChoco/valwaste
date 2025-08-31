@@ -91,12 +91,12 @@ function renderAttendanceTable() {
     tbody.innerHTML = filteredData.map(record => `
         <tr>
             <td>
-                <button class="att-caret" onclick="toggleExpand('${record.id}')" aria-label="toggle">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="${record.expanded ? '6,9 12,15 18,9' : '9,18 15,12 9,6'}"></polyline>
-                    </svg>
-                </button>
                 <div class="att-driver">
+                    <button class="att-caret" onclick="toggleExpand('${record.id}')" aria-label="toggle">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="${record.expanded ? '6,9 12,15 18,9' : '9,18 15,12 9,6'}"></polyline>
+                        </svg>
+                    </button>
                     <div class="att-avatar">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>

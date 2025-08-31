@@ -7,6 +7,73 @@
     <link rel="stylesheet" href="assets/css/styles.css">
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        .role-toggle-minimal {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 3px;
+            color: #6b7280;
+            transition: all 0.2s;
+            opacity: 0.8;
+        }
+        .role-toggle-minimal:hover {
+            background: #f3f4f6;
+            color: #374151;
+            opacity: 1;
+        }
+        .role-toggle-minimal.expanded svg {
+            transform: rotate(180deg);
+        }
+        .user-breakdown-minimal {
+            margin-top: 8px;
+            position: absolute;
+            background: white;
+            border: 2px solid #d1d5db;
+            border-radius: 6px;
+            padding: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            min-width: 160px;
+            left: 0;
+            top: 100%;
+        }
+        .stats-card {
+            position: relative;
+        }
+        .users-card .stats-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            justify-content: center;
+        }
+        .role-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 11px;
+            color: #6b7280;
+        }
+        .role-item:last-child {
+            margin-bottom: 0;
+        }
+        .role-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+        .role-dot.resident { background: #10b981; }
+        .role-dot.official { background: #3b82f6; }
+        .role-dot.driver { background: #f59e0b; }
+        .role-dot.admin { background: #8b5cf6; }
+        .role-text strong {
+            color: #374151;
+        }
+    </style>
 </head>
 <body>
     <div class="app-shell">
@@ -34,11 +101,43 @@
             <div class="page-container">
                 <!-- Stats -->
                 <section class="stats-grid">
-                    <div class="card stats-card">
+                    <div class="card stats-card users-card">
                         <div class="stats-meta">
-                            <p class="stats-label">Total Users</p>
-                            <h3 class="stats-value" id="totalUsers">3</h3>
-                            <p class="stats-sub">Registered in the system</p>
+                            <p class="stats-label" style="margin: 0;">Total Users
+                                <button id="toggleUserView" class="role-toggle-minimal" title="View breakdown" style="float: right; margin-top: -2px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
+                            </p>
+                            <h3 class="stats-value" id="totalUsers">0</h3>
+                            <div id="userBreakdown" class="user-breakdown-minimal" style="display: none;">
+                                <div class="role-item">
+                                    <div style="display: flex; align-items: center;">
+                                        <span class="role-dot resident"></span>Residents:
+                                    </div>
+                                    <strong id="totalResidents">0</strong>
+                                </div>
+                                <div class="role-item">
+                                    <div style="display: flex; align-items: center;">
+                                        <span class="role-dot official"></span>Officials:
+                                    </div>
+                                    <strong id="totalBarangayOfficials">0</strong>
+                                </div>
+                                <div class="role-item">
+                                    <div style="display: flex; align-items: center;">
+                                        <span class="role-dot driver"></span>Drivers:
+                                    </div>
+                                    <strong id="totalDrivers">0</strong>
+                                </div>
+                                <div class="role-item">
+                                    <div style="display: flex; align-items: center;">
+                                        <span class="role-dot admin"></span>Admins:
+                                    </div>
+                                    <strong id="totalAdministrators">0</strong>
+                                </div>
+                            </div>
+                            <p class="stats-sub" id="usersSub">Registered in the system</p>
                         </div>
                         <div class="stats-icon">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -70,7 +169,7 @@
                     <div class="card stats-card">
                         <div class="stats-meta">
                             <p class="stats-label">Total Trucks</p>
-                            <h3 class="stats-value" id="totalTrucks">0</h3>
+                            <h3 class="stats-value" id="totalTrucks">3</h3>
                             <p class="stats-sub">Available on the map</p>
                         </div>
                         <div class="stats-icon">
@@ -284,8 +383,28 @@
         </main>
     </div>
 
+    <!-- Firebase CDN -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    
     <script type="module" src="assets/js/auth.js"></script>
     <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAr5KSpYvShZrCEJLMGf7ckrbfedta3W_M",
+            authDomain: "valwaste-89930.firebaseapp.com",
+            projectId: "valwaste-89930",
+            storageBucket: "valwaste-89930.firebasestorage.app",
+            messagingSenderId: "301491189774",
+            appId: "1:301491189774:web:23f0fa68d2b264946b245f",
+            measurementId: "G-C70DHXP9FW"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
         // Initialize map with MapLibre GL JS and MapTiler
         let map;
         let currentAnnouncement = "No announcement yet.";
@@ -295,16 +414,62 @@
         let isSatelliteEnabled = false;
         let isFullscreenEnabled = false;
         let truckMarkers = [];
-
-        // Fixed truck locations (no randomizer)
-        const truckLocations = [
-            { id: "Truck-01", position: [120.957, 14.734], status: "idle", note: "Idle" },
-            { id: "Truck-02", position: [120.991, 14.716], status: "route", note: "On route" },
-            { id: "Truck-03", position: [120.972, 14.751], status: "collecting", note: "Collecting" }
-        ];
+        let scheduleData = [];
 
         // MapTiler API key
         const MAPTILER_KEY = 'Kr1k642bLPyqdCL0A5yM';
+
+        // Load and count users by role
+        function loadUserCounts() {
+            console.log('Loading user counts from Firebase...');
+            
+            db.collection('users').onSnapshot((snapshot) => {
+                const roleCounts = {
+                    'Resident': 0,
+                    'Barangay Official': 0,
+                    'Driver': 0,
+                    'Administrator': 0
+                };
+                
+                snapshot.forEach((doc) => {
+                    const userData = doc.data();
+                    const role = userData.role;
+                    
+                    if (roleCounts.hasOwnProperty(role)) {
+                        roleCounts[role]++;
+                    }
+                });
+                
+                // Calculate total users
+                const totalUsers = Object.values(roleCounts).reduce((sum, count) => sum + count, 0);
+                
+                // Update dashboard counters
+                document.getElementById('totalUsers').textContent = totalUsers;
+                document.getElementById('totalResidents').textContent = roleCounts['Resident'];
+                document.getElementById('totalBarangayOfficials').textContent = roleCounts['Barangay Official'];
+                document.getElementById('totalDrivers').textContent = roleCounts['Driver'];
+                document.getElementById('totalAdministrators').textContent = roleCounts['Administrator'];
+                
+                console.log('User counts updated:', roleCounts, 'Total:', totalUsers);
+            }, (error) => {
+                console.error('Error loading user counts:', error);
+            });
+        }
+
+        // Toggle user breakdown view
+        function toggleUserBreakdown() {
+            const breakdown = document.getElementById('userBreakdown');
+            const toggleBtn = document.getElementById('toggleUserView');
+            const isExpanded = breakdown.style.display !== 'none';
+            
+            if (isExpanded) {
+                breakdown.style.display = 'none';
+                toggleBtn.classList.remove('expanded');
+            } else {
+                breakdown.style.display = 'block';
+                toggleBtn.classList.add('expanded');
+            }
+        }
 
         function initMap() {
             // Valenzuela City center coordinates
@@ -339,8 +504,8 @@
 
             // Add truck markers when map loads
             map.on('load', () => {
-                // Add initial truck markers
-                addTruckMarkers();
+                // Load truck schedules and add markers
+                loadTruckSchedules();
 
                 // Setup 3D buildings layer (initially hidden)
                 setupBuildingsLayer();
@@ -350,31 +515,97 @@
             setupMapControls();
         }
 
+        // Load truck schedules from Firebase
+        function loadTruckSchedules() {
+            console.log('Loading truck schedules from Firebase...');
+            
+            db.collection('truck_schedule').onSnapshot((snapshot) => {
+                scheduleData = [];
+                snapshot.forEach((doc) => {
+                    const schedule = { id: doc.id, ...doc.data() };
+                    scheduleData.push(schedule);
+                });
+                
+                console.log('Loaded schedules:', scheduleData);
+                addTruckMarkers();
+            }, (error) => {
+                console.error('Error loading truck schedules:', error);
+            });
+        }
+
         function addTruckMarkers() {
             // Clear existing markers
             truckMarkers.forEach(marker => marker.remove());
             truckMarkers = [];
 
-            // Add truck markers with fixed positions
-            truckLocations.forEach((truck) => {
-                const el = document.createElement('div');
-                el.className = 'truck-marker';
-                el.style.cssText = `
-                    width: 20px; height: 20px; border-radius: 50%; 
-                    border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                    background: ${truck.status === 'idle' ? '#3AC84D' : truck.status === 'route' ? '#3B82F6' : '#F59E0B'};
-                `;
+            // Get today's date for filtering current schedules
+            const today = new Date();
+            const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            
+            // Filter schedules for today
+            const todaySchedules = scheduleData.filter(schedule => schedule.date === todayString);
+            
+            console.log('Today\'s schedules:', todaySchedules);
 
-                const popup = new maplibregl.Popup({ offset: 25 })
-                    .setHTML(`<strong>${truck.id}</strong><br/>Status: ${truck.status}<br/>${truck.note}`);
-
-                const marker = new maplibregl.Marker(el)
-                    .setLngLat(truck.position)
-                    .setPopup(popup)
-                    .addTo(map);
+            // Add markers for today's schedules
+            todaySchedules.forEach((schedule) => {
+                if (schedule.location && schedule.location.lat && schedule.location.lng) {
+                    const el = document.createElement('div');
+                    el.className = 'truck-marker';
                     
-                truckMarkers.push(marker);
+                    // Determine status color based on time
+                    const now = new Date();
+                    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                    let status = 'scheduled';
+                    let statusColor = '#6B7280'; // Gray for scheduled
+                    
+                    if (currentTime >= schedule.startTime && currentTime <= schedule.endTime) {
+                        status = 'active';
+                        statusColor = '#3B82F6'; // Blue for active
+                    } else if (currentTime > schedule.endTime) {
+                        status = 'completed';
+                        statusColor = '#10B981'; // Green for completed
+                    }
+                    
+                    el.style.cssText = `
+                        width: 24px; height: 24px; border-radius: 50%; 
+                        border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                        background: ${statusColor};
+                        cursor: pointer;
+                    `;
+
+                    // Create popup with schedule details
+                    const collectorsText = schedule.collectors ? 
+                        schedule.collectors.map(c => c.name).join(', ') : 
+                        'No collectors assigned';
+                    
+                    const streetsText = schedule.streets && schedule.streets.length > 0 ? 
+                        schedule.streets.slice(0, 3).join(', ') + (schedule.streets.length > 3 ? '...' : '') :
+                        'No streets assigned';
+
+                    const popup = new maplibregl.Popup({ offset: 25 })
+                        .setHTML(`
+                            <div style="min-width: 200px;">
+                                <strong>${schedule.truck}</strong><br/>
+                                <strong>Status:</strong> ${status.charAt(0).toUpperCase() + status.slice(1)}<br/>
+                                <strong>Time:</strong> ${schedule.startTime} - ${schedule.endTime}<br/>
+                                <strong>Driver:</strong> ${schedule.driver}<br/>
+                                <strong>Collectors:</strong> ${collectorsText}<br/>
+                                <strong>Streets:</strong> ${streetsText}
+                            </div>
+                        `);
+
+                    const marker = new maplibregl.Marker(el)
+                        .setLngLat([schedule.location.lng, schedule.location.lat])
+                        .setPopup(popup)
+                        .addTo(map);
+                        
+                    truckMarkers.push(marker);
+                }
             });
+            
+            // Update truck count
+            document.getElementById('totalTrucks').textContent = todaySchedules.length;
         }
 
         function setupBuildingsLayer() {
@@ -520,7 +751,7 @@
 
             // Refresh Pins Toggle
             document.getElementById('refreshPins').addEventListener('click', () => {
-                addTruckMarkers();
+                loadTruckSchedules();
                 // Visual feedback
                 const btn = document.getElementById('refreshPins');
                 btn.style.transform = 'rotate(360deg)';
@@ -544,7 +775,7 @@
                 
                 // Re-add markers and buildings after style change
                 map.once('styledata', () => {
-                    addTruckMarkers();
+                    loadTruckSchedules();
                     if (isBuildingsEnabled) {
                         setupBuildingsLayer();
                         setTimeout(() => {
@@ -598,6 +829,10 @@
         // Initialize map when page loads
         document.addEventListener('DOMContentLoaded', function() {
             initMap();
+            loadUserCounts(); // Load user role counts
+            
+            // Setup toggle button event listener
+            document.getElementById('toggleUserView').addEventListener('click', toggleUserBreakdown);
         });
     </script>
 </body>
