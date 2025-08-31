@@ -697,12 +697,15 @@ async function handleCreateUser(e) {
         return;
     }
     
+    // Prepare submit button state outside try so finally can restore it
+    let submitButton = e.target.querySelector('button[type="submit"]');
+    let originalText = submitButton ? submitButton.textContent : 'Create User';
     try {
         // Show loading state
-        const submitButton = e.target.querySelector('button[type="submit"]');
-        const originalText = submitButton.textContent;
-        submitButton.textContent = 'Creating...';
-        submitButton.disabled = true;
+        if (submitButton) {
+            submitButton.textContent = 'Creating...';
+            submitButton.disabled = true;
+        }
         
         // Create user in Firebase Auth (optional - for login capability)
         let authUserId = null;
@@ -745,10 +748,16 @@ async function handleCreateUser(e) {
         console.error('Error creating user:', error);
         showError(error.message || 'Error creating user. Please try again.');
     } finally {
-        // Reset button state
-        const submitButton = e.target.querySelector('button[type="submit"]');
-        submitButton.textContent = originalText;
-        submitButton.disabled = false;
+        // Reset button state (safely)
+        try {
+            submitButton = e.target.querySelector('button[type="submit"]') || submitButton;
+            if (submitButton) {
+                submitButton.textContent = originalText;
+                submitButton.disabled = false;
+            }
+        } catch (e) {
+            console.error('Failed to reset submit button state:', e);
+        }
     }
 }
 
