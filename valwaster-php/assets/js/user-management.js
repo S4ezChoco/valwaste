@@ -723,6 +723,10 @@ async function handleCreateUser(e) {
         
         try {
             console.log('Attempting Firebase Auth creation...');
+            
+            // Store current admin user before creating new user
+            const currentAdmin = firebase.auth().currentUser;
+            
             const userCredential = await firebase.auth().createUserWithEmailAndPassword(userData.email, userData.password);
             authUserId = userCredential.user.uid;
             console.log('✅ SUCCESS: User created in Firebase Auth with UID:', authUserId, 'Role:', userData.role);
@@ -732,6 +736,14 @@ async function handleCreateUser(e) {
                 displayName: `${userData.firstName} ${userData.lastName}`
             });
             console.log('✅ SUCCESS: Display name updated for', userData.role, 'user');
+            
+            // Sign out the newly created user and restore admin session
+            await firebase.auth().signOut();
+            if (currentAdmin) {
+                // Re-authenticate the admin user
+                await firebase.auth().updateCurrentUser(currentAdmin);
+                console.log('✅ SUCCESS: Admin session restored');
+            }
             
         } catch (authError) {
             console.error('❌ FAILED: Firebase Auth creation failed for role:', userData.role);

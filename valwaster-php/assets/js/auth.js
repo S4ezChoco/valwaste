@@ -28,6 +28,12 @@ function initAuth() {
     onAuthStateChanged(auth, (user) => {
         currentUser = user;
         if (user) {
+            // Store admin email in localStorage to prevent it from being overwritten
+            const adminData = JSON.parse(localStorage.getItem('valwaste_admin') || '{}');
+            if (!adminData.email) {
+                adminData.email = user.email;
+                localStorage.setItem('valwaste_admin', JSON.stringify(adminData));
+            }
             updateUserDisplay(user);
         }
     });
@@ -49,7 +55,8 @@ function updateUserDisplay(user) {
     }
     
     if (profileEmailInput) {
-        profileEmailInput.value = user.email || '';
+        // Always use the stored admin email, not the current Firebase user
+        profileEmailInput.value = adminData.email || user.email || '';
     }
 }
 

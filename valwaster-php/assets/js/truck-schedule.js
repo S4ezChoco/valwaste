@@ -45,6 +45,9 @@ document.addEventListener('DOMContentLoaded', function() {
     loadWasteCollectors();
     loadSchedules();
     
+    // Clean up old schedules (older than 7 days)
+    cleanupOldSchedules();
+    
     // Set today's date as default in the modal
     const today = new Date();
     document.getElementById('schedule-date').value = formatDateForInput(today);
@@ -106,7 +109,7 @@ function loadWasteCollectors() {
             });
             
             const span = document.createElement('span');
-            span.textContent = `${userData.firstName} ${userData.lastName} (${userData.role})`;
+            span.textContent = `${userData.firstName} ${userData.lastName} (Palero)`;
             span.style.marginLeft = '8px';
             span.style.cursor = 'pointer';
             
@@ -177,18 +180,33 @@ function generateCalendar() {
         const cellDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const daySchedules = schedules.filter(schedule => schedule.date === cellDate);
         
-        // Add schedule events
-        daySchedules.forEach(schedule => {
+        // Add schedule events (show max 3, then a "more" button)
+        const maxVisible = 3;
+        daySchedules.slice(0, maxVisible).forEach((schedule, index) => {
             const event = document.createElement('div');
             event.className = 'schedule-event';
             event.textContent = `${schedule.truck} - ${schedule.startTime}`;
             event.title = `${schedule.truck} - ${schedule.driver}`;
+            event.style.top = `${8 + (index * 16)}px`; // Stack events vertically
             event.onclick = function(e) {
                 e.stopPropagation();
                 openScheduleDetails(schedule);
             };
             cell.appendChild(event);
         });
+        
+        // Add "more" button if there are more than 3 schedules
+        if (daySchedules.length > maxVisible) {
+            const moreBtn = document.createElement('button');
+            moreBtn.className = 'schedule-more-btn';
+            moreBtn.textContent = `+${daySchedules.length - maxVisible} more`;
+            moreBtn.style.top = `${8 + (maxVisible * 16)}px`;
+            moreBtn.onclick = function(e) {
+                e.stopPropagation();
+                openDaySchedulesModal(cellDate, daySchedules);
+            };
+            cell.appendChild(moreBtn);
+        }
         
         // Add plus button
         const addBtn = document.createElement('button');
@@ -294,11 +312,9 @@ function openCreateModal() {
     document.getElementById('create-schedule-modal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
     
-    // Initialize map when modal opens and show initial streets
+    // Initialize map when modal opens
     setTimeout(() => {
         initLocationMap();
-        // Show all streets initially
-        displayStreetsChecklist(getStreetsArray());
     }, 300);
 }
 
@@ -391,7 +407,7 @@ function toggleCollector(collectorId, collectorName) {
     if (checkbox.checked) {
         if (selectedCollectors.length >= 3) {
             checkbox.checked = false;
-            alert('You can only select up to 3 waste collectors.');
+            showWarning('You can only select up to 3 waste collectors.');
             return;
         }
         selectedCollectors.push({ id: collectorId, name: collectorName });
@@ -542,41 +558,7 @@ function initLocationMap() {
                 });
             });
             
-            // Add click handler for location selection
-            scheduleMap.on('click', function(e) {
-                console.log('Map clicked at:', e.lngLat);
-                
-                const coordinates = e.lngLat;
-                selectedLocation = {
-                    lng: coordinates.lng,
-                    lat: coordinates.lat
-                };
-                
-                // Update coordinates display
-                const coordsDisplay = document.getElementById('coordinates-display');
-                if (coordsDisplay) {
-                    coordsDisplay.innerHTML = `
-                        <strong>Selected Location:</strong><br>
-                        Latitude: ${coordinates.lat.toFixed(6)}<br>
-                        Longitude: ${coordinates.lng.toFixed(6)}
-                    `;
-                }
-                
-                // Remove existing marker
-                if (window.locationMarker) {
-                    window.locationMarker.remove();
-                }
-                
-                // Add new marker
-                window.locationMarker = new maplibregl.Marker({
-                    color: '#3b82f6'
-                })
-                    .setLngLat([coordinates.lng, coordinates.lat])
-                    .addTo(scheduleMap);
-                    
-                // Load nearby streets based on location
-                loadNearbyStreets(coordinates.lat, coordinates.lng);
-            });
+            // Remove click handler for location selection - now using street checklist only
             
             // Handle map errors
             scheduleMap.on('error', function(e) {
@@ -618,8 +600,8 @@ function searchStreets() {
         return;
     }
     
-    const filteredStreets = getStreetsArray().filter(street => 
-        street.toLowerCase().includes(query.toLowerCase())
+    const filteredStreets = getStreetsArray().filter(streetObj => 
+        streetObj.display.toLowerCase().includes(query.toLowerCase())
     );
     
     displayStreetsChecklist(filteredStreets);
@@ -628,41 +610,140 @@ function searchStreets() {
 function getAllValenzuelaStreets() {
     return {
         'District 1': {
-            'Arkong Bato': ['M.H. del Pilar Street'],
-            'Balangkas': ['P. Deato Street', 'Sampaguita Street'],
-            'Bignay': ['Bignay-Llano Road', 'Hulo Street'],
-            'Bisig': ['Bisig Road'],
-            'Canumay East': ['NLEx East Service Road'],
-            'Canumay West': ['J. Gregorio Street'],
-            'Coloong': ['Coloong 1 Road', 'Coloong 2 Road', 'Cabeza C. Porciuncula Street'],
-            'Dalandanan': ['Dalandanan-Veinte Reales Road', 'G. Lazaro Road'],
-            'Isla': ['Isla Road'],
-            'Lawang Bato': ['Lawang Bato Road', 'NLEx East Service Road'],
-            'Lingunan': ['T. Santiago Street', 'Maxima Steel Road'],
-            'Mabolo': ['M.H. del Pilar Street'],
-            'Malanday': ['MacArthur Highway', 'M.H. del Pilar Street'],
-            'Malinta': ['Maysan Road', 'MacArthur Highway'],
-            'Palasan': ['M.H. del Pilar Street'],
-            'Pariancillo Villa': ['Gen. Velilla Street', 'Dr. Pio Valenzuela Street'],
-            'Pasolo': ['Pasolo Road', 'M.H. del Pilar Street'],
-            'Poblacion': ['Polo Road', 'M.H. del Pilar Street'],
-            'Polo': ['Polo Road', 'M.H. del Pilar Street'],
-            'Punturin': ['Punturin Road', 'NLEx Service Road'],
-            'Rincon': ['Rincon-Pasolo-Mabolo Road'],
-            'Tagalag': ['Tagalag Road'],
-            'Veinte Reales': ['Veinte Reales Road'],
-            'Wawang Pulo': ['Tullahan River Area Streets']
+            'Arkong Bato': {
+                coordinates: [120.9650, 14.7350],
+                streets: ['M.H. del Pilar Street']
+            },
+            'Balangkas': {
+                coordinates: [120.9720, 14.7280],
+                streets: ['P. Deato Street', 'Sampaguita Street']
+            },
+            'Bignay': {
+                coordinates: [120.9580, 14.7420],
+                streets: ['Bignay-Llano Road', 'Hulo Street']
+            },
+            'Bisig': {
+                coordinates: [120.9680, 14.7380],
+                streets: ['Bisig Road']
+            },
+            'Canumay East': {
+                coordinates: [120.9750, 14.7200],
+                streets: ['NLEx East Service Road']
+            },
+            'Canumay West': {
+                coordinates: [120.9700, 14.7220],
+                streets: ['J. Gregorio Street']
+            },
+            'Coloong': {
+                coordinates: [120.9620, 14.7300],
+                streets: ['Coloong 1 Road', 'Coloong 2 Road', 'Cabeza C. Porciuncula Street']
+            },
+            'Dalandanan': {
+                coordinates: [120.9550, 14.7450],
+                streets: ['Dalandanan-Veinte Reales Road', 'G. Lazaro Road']
+            },
+            'Isla': {
+                coordinates: [120.9600, 14.7400],
+                streets: ['Isla Road']
+            },
+            'Lawang Bato': {
+                coordinates: [120.9780, 14.7150],
+                streets: ['Lawang Bato Road', 'NLEx East Service Road']
+            },
+            'Lingunan': {
+                coordinates: [120.9640, 14.7320],
+                streets: ['T. Santiago Street', 'Maxima Steel Road']
+            },
+            'Mabolo': {
+                coordinates: [120.9660, 14.7340],
+                streets: ['M.H. del Pilar Street']
+            },
+            'Malanday': {
+                coordinates: [120.9700, 14.7250],
+                streets: ['MacArthur Highway', 'M.H. del Pilar Street']
+            },
+            'Malinta': {
+                coordinates: [120.9720, 14.7180],
+                streets: ['Maysan Road', 'MacArthur Highway']
+            },
+            'Palasan': {
+                coordinates: [120.9680, 14.7360],
+                streets: ['M.H. del Pilar Street']
+            },
+            'Pariancillo Villa': {
+                coordinates: [120.9750, 14.7100],
+                streets: ['Gen. Velilla Street', 'Dr. Pio Valenzuela Street']
+            },
+            'Pasolo': {
+                coordinates: [120.9670, 14.7330],
+                streets: ['Pasolo Road', 'M.H. del Pilar Street']
+            },
+            'Poblacion': {
+                coordinates: [120.9700, 14.7200],
+                streets: ['Polo Road', 'M.H. del Pilar Street']
+            },
+            'Polo': {
+                coordinates: [120.9710, 14.7190],
+                streets: ['Polo Road', 'M.H. del Pilar Street']
+            },
+            'Punturin': {
+                coordinates: [120.9800, 14.7050],
+                streets: ['Punturin Road', 'NLEx Service Road']
+            },
+            'Rincon': {
+                coordinates: [120.9650, 14.7350],
+                streets: ['Rincon-Pasolo-Mabolo Road']
+            },
+            'Tagalag': {
+                coordinates: [120.9590, 14.7410],
+                streets: ['Tagalag Road']
+            },
+            'Veinte Reales': {
+                coordinates: [120.9520, 14.7480],
+                streets: ['Veinte Reales Road']
+            },
+            'Wawang Pulo': {
+                coordinates: [120.9580, 14.7430],
+                streets: ['Tullahan River Area Streets']
+            }
         },
         'District 2': {
-            'Bagbaguin': ['ITC Compound Streets'],
-            'Gen. T. de Leon': ['Gen. T. de Leon Street'],
-            'Karuhatan': ['MacArthur Highway', 'A. Pablo Street'],
-            'Mapulang Lupa': ['Industrial Area Streets'],
-            'Marulas': ['MacArthur Highway', 'Pio Valenzuela Street'],
-            'Maysan': ['Maysan Road', 'C. Cabral Street'],
-            'Parada': ['Residential Streets'],
-            'Paso de Blas': ['NLEx Service Road'],
-            'Ugong': ['Mindanao Avenue Extension']
+            'Bagbaguin': {
+                coordinates: [120.9850, 14.6950],
+                streets: ['ITC Compound Streets']
+            },
+            'Gen. T. de Leon': {
+                coordinates: [120.9820, 14.7000],
+                streets: ['Gen. T. de Leon Street']
+            },
+            'Karuhatan': {
+                coordinates: [120.9800, 14.7020],
+                streets: ['MacArthur Highway', 'A. Pablo Street']
+            },
+            'Mapulang Lupa': {
+                coordinates: [120.9780, 14.7080],
+                streets: ['Industrial Area Streets']
+            },
+            'Marulas': {
+                coordinates: [120.9750, 14.7120],
+                streets: ['MacArthur Highway', 'Pio Valenzuela Street']
+            },
+            'Maysan': {
+                coordinates: [120.9730, 14.7160],
+                streets: ['Maysan Road', 'C. Cabral Street']
+            },
+            'Parada': {
+                coordinates: [120.9760, 14.7100],
+                streets: ['Residential Streets']
+            },
+            'Paso de Blas': {
+                coordinates: [120.9810, 14.6980],
+                streets: ['NLEx Service Road']
+            },
+            'Ugong': {
+                coordinates: [120.9840, 14.6920],
+                streets: ['Mindanao Avenue Extension']
+            }
         }
     };
 }
@@ -671,16 +752,23 @@ function getStreetsArray() {
     const streetsData = getAllValenzuelaStreets();
     const allStreets = [];
     
-    // Flatten the structure to get all streets
+    // Flatten the structure to get all streets with coordinates
     Object.keys(streetsData).forEach(district => {
         Object.keys(streetsData[district]).forEach(barangay => {
-            streetsData[district][barangay].forEach(street => {
-                allStreets.push(`${street} (${barangay}, ${district})`);
+            const barangayData = streetsData[district][barangay];
+            barangayData.streets.forEach(street => {
+                allStreets.push({
+                    display: `${street} (${barangay}, ${district})`,
+                    street: street,
+                    barangay: barangay,
+                    district: district,
+                    coordinates: barangayData.coordinates
+                });
             });
         });
     });
     
-    return allStreets.sort();
+    return allStreets.sort((a, b) => a.display.localeCompare(b.display));
 }
 
 function loadNearbyStreets(lat, lng) {
@@ -713,6 +801,9 @@ function loadNearbyStreets(lat, lng) {
     displayStreetsChecklist(nearbyStreets);
 }
 
+// Global variable to store map markers
+let streetMarkers = [];
+
 function displayStreetsChecklist(streets) {
     const checklist = document.getElementById('streets-checklist');
     if (!checklist) {
@@ -727,19 +818,111 @@ function displayStreetsChecklist(streets) {
         return;
     }
     
-    streets.forEach((street, index) => {
+    streets.forEach((streetObj, index) => {
         const streetItem = document.createElement('div');
         streetItem.className = 'street-item';
-        const streetId = `street-${index}-${street.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '')}`;
+        const streetId = `street-${index}-${streetObj.display.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '')}`;
         
-        streetItem.innerHTML = `
-            <input type="checkbox" id="${streetId}" name="selected-streets" value="${street}">
-            <label for="${streetId}" style="cursor: pointer; flex: 1;">${street}</label>
-        `;
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = streetId;
+        checkbox.name = 'selected-streets';
+        checkbox.value = streetObj.display;
+        checkbox.addEventListener('change', function() {
+            handleStreetSelection(streetObj, this.checked);
+        });
+        
+        const label = document.createElement('label');
+        label.htmlFor = streetId;
+        label.style.cursor = 'pointer';
+        label.style.flex = '1';
+        label.textContent = streetObj.display;
+        
+        streetItem.appendChild(checkbox);
+        streetItem.appendChild(label);
         checklist.appendChild(streetItem);
     });
     
     console.log(`Displayed ${streets.length} streets in checklist`);
+}
+
+function handleStreetSelection(streetObj, isChecked) {
+    if (!scheduleMap) return;
+    
+    if (isChecked) {
+        // Add marker to map
+        const marker = new maplibregl.Marker({
+            color: '#22c55e' // Green color for selected streets
+        })
+            .setLngLat(streetObj.coordinates)
+            .addTo(scheduleMap);
+        
+        // Store marker with street info
+        streetMarkers.push({
+            marker: marker,
+            streetData: streetObj
+        });
+        
+        // Update coordinates display
+        updateCoordinatesDisplay();
+        
+        // Center map on the selected area if it's the first selection
+        if (streetMarkers.length === 1) {
+            scheduleMap.flyTo({
+                center: streetObj.coordinates,
+                zoom: 14,
+                duration: 1000
+            });
+        }
+    } else {
+        // Remove marker from map
+        const markerIndex = streetMarkers.findIndex(m => 
+            m.streetData.display === streetObj.display
+        );
+        
+        if (markerIndex !== -1) {
+            streetMarkers[markerIndex].marker.remove();
+            streetMarkers.splice(markerIndex, 1);
+        }
+        
+        // Update coordinates display
+        updateCoordinatesDisplay();
+    }
+}
+
+function updateCoordinatesDisplay() {
+    const coordsDisplay = document.getElementById('coordinates-display');
+    if (!coordsDisplay) return;
+    
+    if (streetMarkers.length === 0) {
+        coordsDisplay.innerHTML = 'Select streets from the checklist to pin locations on the map';
+        selectedLocation = null;
+    } else if (streetMarkers.length === 1) {
+        const coords = streetMarkers[0].streetData.coordinates;
+        coordsDisplay.innerHTML = `
+            <strong>Selected Location:</strong><br>
+            ${streetMarkers[0].streetData.barangay}, ${streetMarkers[0].streetData.district}<br>
+            Latitude: ${coords[1].toFixed(6)}, Longitude: ${coords[0].toFixed(6)}
+        `;
+        selectedLocation = {
+            lng: coords[0],
+            lat: coords[1]
+        };
+    } else {
+        // Calculate center point of all selected streets
+        const avgLng = streetMarkers.reduce((sum, m) => sum + m.streetData.coordinates[0], 0) / streetMarkers.length;
+        const avgLat = streetMarkers.reduce((sum, m) => sum + m.streetData.coordinates[1], 0) / streetMarkers.length;
+        
+        coordsDisplay.innerHTML = `
+            <strong>Selected Locations:</strong><br>
+            ${streetMarkers.length} streets selected<br>
+            Center: ${avgLat.toFixed(6)}, ${avgLng.toFixed(6)}
+        `;
+        selectedLocation = {
+            lng: avgLng,
+            lat: avgLat
+        };
+    }
 }
 
 // Handle form submission
@@ -754,17 +937,12 @@ function handleCreateSchedule(event) {
     
     // Validate required fields
     if (!selectedDriverId) {
-        alert('Please select a driver.');
+        showError('Please select a driver.');
         return;
     }
     
     if (selectedCollectors.length !== 3) {
-        alert('Please select exactly 3 waste collectors.');
-        return;
-    }
-    
-    if (!selectedLocation) {
-        alert('Please select a location on the map.');
+        showError('Please select exactly 3 waste collectors.');
         return;
     }
     
@@ -775,13 +953,19 @@ function handleCreateSchedule(event) {
     });
     
     if (selectedStreets.length === 0) {
-        alert('Please select at least one street.');
+        showError('Please select at least one street from the checklist.');
+        return;
+    }
+    
+    // selectedLocation is now automatically set when streets are selected
+    if (!selectedLocation) {
+        showError('Please select at least one street to set the location.');
         return;
     }
     
     // Validate time
     if (endTime <= startTime) {
-        alert('End time must be later than start time.');
+        showError('End time must be later than start time.');
         return;
     }
     
@@ -804,13 +988,13 @@ function handleCreateSchedule(event) {
     db.collection('truck_schedule').add(schedule)
         .then((docRef) => {
             console.log('Schedule created with ID:', docRef.id);
-            alert('Schedule created successfully!');
+            showSuccess('Schedule created successfully!');
             closeCreateModal();
             resetForm();
         })
         .catch((error) => {
             console.error('Error creating schedule:', error);
-            alert('Error creating schedule. Please try again.');
+            showError('Error creating schedule. Please try again.');
         });
 }
 
@@ -855,8 +1039,10 @@ function openCreateModal() {
     // Update UI
     document.getElementById('driver-selected-text').textContent = 'Select driver';
     document.getElementById('collectors-selected-text').textContent = 'Select waste collectors';
-    document.getElementById('coordinates-display').innerHTML = 'Click on the map to select a location';
-    document.getElementById('streets-checklist').innerHTML = '';
+    document.getElementById('coordinates-display').innerHTML = 'Select streets from the checklist to pin locations on the map';
+    
+    // Show all streets immediately
+    displayStreetsChecklist(getStreetsArray());
     
     // Initialize map after modal animation completes
     setTimeout(() => {
@@ -886,7 +1072,7 @@ function resetForm() {
     
     document.getElementById('driver-selected-text').textContent = 'Select driver';
     document.getElementById('collectors-selected-text').textContent = 'Select waste collectors';
-    document.getElementById('coordinates-display').textContent = 'Click on the map to select a location';
+    document.getElementById('coordinates-display').innerHTML = 'Select streets from the checklist to pin locations on the map';
     document.getElementById('streets-checklist').innerHTML = '';
     
     const searchInput = document.getElementById('street-search');
@@ -894,9 +1080,55 @@ function resetForm() {
         searchInput.value = '';
     }
     
+    // Clear all street markers
+    streetMarkers.forEach(markerObj => {
+        markerObj.marker.remove();
+    });
+    streetMarkers = [];
+    
+    // Clear old location marker if it exists
     if (window.locationMarker) {
         window.locationMarker.remove();
         window.locationMarker = null;
+    }
+}
+
+// Clean up schedules older than 7 days
+async function cleanupOldSchedules() {
+    try {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        console.log('Checking for schedules older than:', sevenDaysAgo.toDateString());
+        
+        const schedulesRef = firebase.firestore().collection('truck_schedule');
+        const oldSchedulesQuery = schedulesRef.where('date', '<', sevenDaysAgo.toISOString().split('T')[0]);
+        
+        const querySnapshot = await oldSchedulesQuery.get();
+        
+        if (!querySnapshot.empty) {
+            const batch = firebase.firestore().batch();
+            let deleteCount = 0;
+            
+            querySnapshot.forEach((doc) => {
+                batch.delete(doc.ref);
+                deleteCount++;
+                console.log('Marking for deletion:', doc.id, 'Date:', doc.data().date);
+            });
+            
+            await batch.commit();
+            console.log(`✅ Successfully deleted ${deleteCount} old schedule(s)`);
+            
+            // Show notification to admin
+            if (deleteCount > 0 && typeof showInfo === 'function') {
+                showInfo(`Cleaned up ${deleteCount} old schedule(s) from last week`);
+            }
+        } else {
+            console.log('No old schedules found to delete');
+        }
+        
+    } catch (error) {
+        console.error('Error cleaning up old schedules:', error);
     }
 }
 
@@ -964,7 +1196,7 @@ function closeDetailsModal() {
 
 function editSchedule() {
     // TODO: Implement edit functionality
-    alert('Edit functionality will be implemented in the future.');
+    showInfo('Edit functionality will be implemented in the future.');
     closeDetailsModal();
 }
 
@@ -976,6 +1208,65 @@ function formatDateDisplay(dateString) {
         month: 'long', 
         day: 'numeric' 
     });
+}
+
+// Day schedules modal functions
+let selectedDayDate = null;
+
+function openDaySchedulesModal(dateString, daySchedules) {
+    selectedDayDate = dateString;
+    const modal = document.getElementById('day-schedules-modal');
+    const dateDisplay = document.getElementById('selected-day-date');
+    const schedulesList = document.getElementById('day-schedules-list');
+    
+    // Format and display the date
+    dateDisplay.textContent = formatDateDisplay(dateString);
+    
+    // Clear previous content
+    schedulesList.innerHTML = '';
+    
+    // Populate schedules
+    daySchedules.forEach(schedule => {
+        const scheduleItem = document.createElement('div');
+        scheduleItem.className = 'day-schedule-item';
+        scheduleItem.onclick = () => {
+            closeDaySchedulesModal();
+            openScheduleDetails(schedule);
+        };
+        
+        scheduleItem.innerHTML = `
+            <div class="day-schedule-header">
+                <div class="day-schedule-truck">${schedule.truck}</div>
+                <div class="day-schedule-time">${schedule.startTime} - ${schedule.endTime}</div>
+            </div>
+            <div class="day-schedule-details">
+                <div><strong>Driver:</strong> ${schedule.driver}</div>
+                <div><strong>Collectors:</strong> ${schedule.collectors ? schedule.collectors.map(c => c.name).join(', ') : 'N/A'}</div>
+                <div><strong>Streets:</strong> ${schedule.streets ? schedule.streets.slice(0, 2).join(', ') + (schedule.streets.length > 2 ? ` +${schedule.streets.length - 2} more` : '') : 'N/A'}</div>
+            </div>
+        `;
+        
+        schedulesList.appendChild(scheduleItem);
+    });
+    
+    // Show modal
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDaySchedulesModal() {
+    const modal = document.getElementById('day-schedules-modal');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+    selectedDayDate = null;
+}
+
+function createNewScheduleForDay() {
+    if (selectedDayDate) {
+        const date = new Date(selectedDayDate + 'T00:00:00');
+        closeDaySchedulesModal();
+        openCreateModalForDate(date);
+    }
 }
 
 // Close details modal when clicking outside

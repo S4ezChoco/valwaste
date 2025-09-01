@@ -208,6 +208,61 @@
             background: #d1fae5;
             color: #059669;
         }
+        .schedule-more-btn {
+            background: #6b7280;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            cursor: pointer;
+            position: absolute;
+            left: 8px;
+            right: 8px;
+            border: none;
+            text-align: center;
+        }
+        .schedule-more-btn:hover {
+            background: #4b5563;
+        }
+        .day-schedules-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .day-schedule-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            background: #f9fafb;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .day-schedule-item:hover {
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }
+        .day-schedule-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .day-schedule-truck {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 16px;
+        }
+        .day-schedule-time {
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .day-schedule-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 14px;
+            color: #6b7280;
+        }
     </style>
 </head>
 <body>
@@ -522,12 +577,39 @@
         </div>
     </div>
 
+    <!-- Day Schedules Modal -->
+    <div class="um-modal sched-modal" id="day-schedules-modal" style="display: none;">
+        <div class="um-modal-card large sched-modal-card" role="dialog" aria-modal="true" aria-labelledby="day-schedules-title">
+            <button class="um-modal-close" aria-label="Close" onclick="closeDaySchedulesModal()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+
+            <h3 id="day-schedules-title" class="um-modal-title">Schedules for <span id="selected-day-date"></span></h3>
+            <p class="um-modal-sub">All schedules for this day</p>
+
+            <div class="um-form sched-modal-scroll">
+                <div id="day-schedules-list" class="day-schedules-container">
+                    <!-- Schedules will be populated here -->
+                </div>
+            </div>
+
+            <div class="sched-modal-actions">
+                <button type="button" class="btn-ghost" onclick="closeDaySchedulesModal()">Close</button>
+                <button type="button" class="btn-primary" onclick="createNewScheduleForDay()">Add New Schedule</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase CDN -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     
     <script type="module" src="assets/js/auth.js"></script>
+    <script src="assets/js/notifications.js"></script>
     <script src="assets/js/truck-schedule.js"></script>
 </body>
 </html>
