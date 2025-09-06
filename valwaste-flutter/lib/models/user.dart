@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+enum UserRole { resident, barangayOfficial, driver, collector, administrator }
+
 class UserModel {
   final String id;
   final String name;
@@ -7,6 +9,7 @@ class UserModel {
   final String phone;
   final String address;
   final String barangay;
+  final UserRole role;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -17,6 +20,7 @@ class UserModel {
     required this.phone,
     required this.address,
     required this.barangay,
+    required this.role,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -25,11 +29,12 @@ class UserModel {
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'] ?? '',
-      name: json['name'] ?? '',
+      name: _buildName(json),
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',
       address: json['address'] ?? '',
       barangay: json['barangay'] ?? '',
+      role: _parseRole(json['role']),
       createdAt: json['createdAt'] != null
           ? (json['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
@@ -41,21 +46,96 @@ class UserModel {
 
   // Create from Firestore document
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return UserModel(
-      id: doc.id,
-      name: data['name'] ?? '',
-      email: data['email'] ?? '',
-      phone: data['phone'] ?? '',
-      address: data['address'] ?? '',
-      barangay: data['barangay'] ?? '',
-      createdAt: data['createdAt'] != null
-          ? (data['createdAt'] as Timestamp).toDate()
-          : DateTime.now(),
-      updatedAt: data['updatedAt'] != null
-          ? (data['updatedAt'] as Timestamp).toDate()
-          : DateTime.now(),
-    );
+    try {
+      final data = doc.data() as Map<String, dynamic>;
+      return UserModel(
+        id: doc.id,
+        name: _buildName(data),
+        email: data['email']?.toString() ?? '',
+        phone: data['phone']?.toString() ?? '',
+        address: data['address']?.toString() ?? '',
+        barangay: data['barangay']?.toString() ?? '',
+        role: _parseRole(data['role']),
+        createdAt: _parseTimestamp(data['createdAt']),
+        updatedAt: _parseTimestamp(data['updatedAt']),
+      );
+    } catch (e) {
+      print('Error creating UserModel from Firestore: $e');
+      print('Raw data: ${doc.data()}');
+      rethrow;
+    }
+  }
+
+  // Build name from firstName and lastName or use name field
+  static String _buildName(Map<String, dynamic> data) {
+    // Check if firstName and lastName exist
+    final firstName = data['firstName']?.toString() ?? '';
+    final lastName = data['lastName']?.toString() ?? '';
+
+    if (firstName.isNotEmpty && lastName.isNotEmpty) {
+      return '$firstName $lastName'.trim();
+    }
+
+    // Fallback to name field if it exists
+    final name = data['name']?.toString() ?? '';
+    if (name.isNotEmpty) {
+      return name;
+    }
+
+    // If no name data, return empty string
+    return '';
+  }
+
+  // Parse role from string
+  static UserRole _parseRole(dynamic roleData) {
+    if (roleData == null) return UserRole.resident;
+
+    String roleString = roleData.toString().toLowerCase();
+    switch (roleString) {
+      case 'resident':
+        return UserRole.resident;
+      case 'barangay official':
+      case 'barangayofficial':
+        return UserRole.barangayOfficial;
+      case 'driver':
+        return UserRole.driver;
+      case 'collector':
+        return UserRole.collector;
+      case 'administrator':
+      case 'admin':
+        return UserRole.administrator;
+      default:
+        return UserRole.resident;
+    }
+  }
+
+  // Parse timestamp safely
+  static DateTime _parseTimestamp(dynamic timestamp) {
+    try {
+      if (timestamp == null) return DateTime.now();
+      if (timestamp is Timestamp) return timestamp.toDate();
+      if (timestamp is String) return DateTime.parse(timestamp);
+      return DateTime.now();
+    } catch (e) {
+      print('Error parsing timestamp: $e');
+      return DateTime.now();
+    }
+  }
+
+  // Convert role to string for Firestore
+  String get roleString {
+    switch (role) {
+      case UserRole.resident:
+        return 'Resident';
+      case UserRole.barangayOfficial:
+        return 'Barangay Official';
+      case UserRole.driver:
+        return 'Driver';
+      case UserRole.collector:
+        return 'Collector';
+      case UserRole.administrator:
+        return 'Administrator';
+    }
   }
 
   // Convert to JSON
@@ -67,6 +147,7 @@ class UserModel {
       'phone': phone,
       'address': address,
       'barangay': barangay,
+      'role': roleString,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -80,6 +161,7 @@ class UserModel {
       'phone': phone,
       'address': address,
       'barangay': barangay,
+      'role': roleString,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -93,6 +175,7 @@ class UserModel {
     String? phone,
     String? address,
     String? barangay,
+    UserRole? role,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -103,6 +186,7 @@ class UserModel {
       phone: phone ?? this.phone,
       address: address ?? this.address,
       barangay: barangay ?? this.barangay,
+      role: role ?? this.role,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -110,7 +194,7 @@ class UserModel {
 
   @override
   String toString() {
-    return 'UserModel(id: $id, name: $name, email: $email, phone: $phone, address: $address, barangay: $barangay)';
+    return 'UserModel(id: $id, name: $name, email: $email, phone: $phone, address: $address, barangay: $barangay, role: $roleString)';
   }
 
   @override
@@ -122,7 +206,8 @@ class UserModel {
         other.email == email &&
         other.phone == phone &&
         other.address == address &&
-        other.barangay == barangay;
+        other.barangay == barangay &&
+        other.role == role;
   }
 
   @override
@@ -132,6 +217,7 @@ class UserModel {
         email.hashCode ^
         phone.hashCode ^
         address.hashCode ^
-        barangay.hashCode;
+        barangay.hashCode ^
+        role.hashCode;
   }
 }

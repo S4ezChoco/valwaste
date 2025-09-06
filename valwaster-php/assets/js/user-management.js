@@ -12,7 +12,11 @@ const valenzuelaBarangays = [
     "Viente Reales", "Wawang Pulo"
 ];
 
-const userRoles = ["Resident", "Barangay Official", "Driver"];
+// All roles that can exist in the system (for reading/displaying)
+const allUserRoles = ["Resident", "Barangay Official", "Driver", "Waste Collector"];
+
+// Roles that can be created through admin panel (excluding Resident - mobile app only)
+const adminCreatableRoles = ["Barangay Official", "Driver", "Waste Collector"];
 
 // Firebase configuration
 const firebaseConfig = {
@@ -242,11 +246,11 @@ function populateBarangayDropdown() {
 }
 
 function populateRoleDropdowns() {
-    // Populate create user role dropdown
+    // Populate create user role dropdown - only admin-creatable roles
     const roleSelect = document.getElementById('userRole');
     if (roleSelect) {
         roleSelect.innerHTML = '';
-        userRoles.forEach(role => {
+        adminCreatableRoles.forEach(role => {
             const option = document.createElement('option');
             option.value = role;
             option.textContent = role;
@@ -254,14 +258,14 @@ function populateRoleDropdowns() {
         });
     }
 
-    // Populate filter dropdown
+    // Populate filter dropdown - show all roles for filtering/viewing
     const filterMenu = document.getElementById('roleFilterMenu');
     if (filterMenu) {
         filterMenu.innerHTML = '';
         const allRolesOption = createFilterOption('All Roles');
         filterMenu.appendChild(allRolesOption);
         
-        userRoles.forEach(role => {
+        allUserRoles.forEach(role => {
             const option = createFilterOption(role);
             filterMenu.appendChild(option);
         });
@@ -297,11 +301,11 @@ function populateEditDropdowns() {
         });
     }
 
-    // Populate edit role dropdown
+    // Populate edit role dropdown - show all roles for editing existing users
     const editRoleSelect = document.getElementById('editRole');
     if (editRoleSelect) {
         editRoleSelect.innerHTML = '';
-        userRoles.forEach(role => {
+        allUserRoles.forEach(role => {
             const option = document.createElement('option');
             option.value = role;
             option.textContent = role;
@@ -506,8 +510,8 @@ function showErrorState(errorMessage) {
 function filterUsers() {
     console.log('Filtering users... Total users:', allUsers.length, 'Current filter:', currentFilter);
     
-    // Define valid roles for All Roles filter
-    const validRoles = ["Resident", "Barangay Official", "Driver"];
+    // Define valid roles for All Roles filter - use all possible user roles
+    const validRoles = allUserRoles;
     
     // Start with all users
     let filtered = [...allUsers];

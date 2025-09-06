@@ -23,7 +23,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadUserData() async {
     try {
-      final user = FirebaseAuthService.currentUser;
+      print('ProfileScreen: Loading user data with force refresh...');
+      final user = await FirebaseAuthService.getCurrentUserWithForceRefresh();
+      print(
+        'ProfileScreen: User data loaded: ${user?.name ?? 'null'} (${user?.roleString ?? 'null'})',
+      );
       setState(() {
         _currentUser = user;
         _isLoading = false;
@@ -43,7 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Compact Header
+            // Header
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(
@@ -100,7 +104,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const Spacer(),
                   IconButton(
-                    onPressed: () => _loadUserData(),
+                    onPressed: () async {
+                      setState(() {
+                        _isLoading = true;
+                      });
+                      await _loadUserData();
+                    },
                     icon: const Icon(
                       Icons.refresh,
                       color: Colors.white,
@@ -113,7 +122,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            // User Profile Section - Avatar and Name Only
+            // User Profile Section
             Container(
               width: double.infinity,
               margin: const EdgeInsets.all(AppSizes.paddingMedium),
@@ -137,80 +146,153 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                     )
-                  : GestureDetector(
-                      onTap: () => _showUserDetails(context),
-                      child: Row(
-                        children: [
-                          // Avatar
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppColors.primary,
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
+                  : Column(
+                      children: [
+                        // Welcome Message
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSizes.paddingMedium,
+                            vertical: AppSizes.paddingSmall,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(
+                              AppSizes.radiusMedium,
                             ),
-                            child: const Icon(
-                              Icons.person,
-                              size: 30,
-                              color: AppColors.primary,
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.1),
                             ),
                           ),
-                          const SizedBox(width: AppSizes.paddingMedium),
+                          child: Text(
+                            _getWelcomeMessage(_currentUser?.role),
+                            style: AppTextStyles.body1.copyWith(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(height: AppSizes.paddingMedium),
 
-                          // User Name
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _currentUser?.name ?? 'User',
-                                  style: AppTextStyles.heading3.copyWith(
-                                    fontWeight: FontWeight.bold,
+                        // User Info Row
+                        GestureDetector(
+                          onTap: () => _showUserDetails(context),
+                          child: Row(
+                            children: [
+                              // Avatar
+                              Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
                                     color: AppColors.primary,
-                                    fontSize: 18,
+                                    width: 2,
                                   ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primary.withOpacity(0.2),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Tap to view details',
-                                  style: AppTextStyles.body2.copyWith(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 12,
-                                  ),
+                                child: const Icon(
+                                  Icons.person,
+                                  size: 30,
+                                  color: AppColors.primary,
                                 ),
-                              ],
-                            ),
-                          ),
-
-                          // Arrow Icon
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(
-                                AppSizes.radiusSmall,
                               ),
-                            ),
-                            child: const Icon(
-                              Icons.arrow_forward_ios,
-                              color: AppColors.primary,
-                              size: 16,
-                            ),
+                              const SizedBox(width: AppSizes.paddingMedium),
+
+                              // User Name and Role
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _currentUser?.name ?? 'User',
+                                      style: AppTextStyles.heading3.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.primary,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    // Role Badge
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(
+                                          0.1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: AppColors.primary.withOpacity(
+                                            0.3,
+                                          ),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            _getRoleIcon(_currentUser?.role),
+                                            color: AppColors.primary,
+                                            size: 12,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _currentUser?.roleString ??
+                                                'Unknown Role',
+                                            style: AppTextStyles.body2.copyWith(
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Tap to view details',
+                                      style: AppTextStyles.body2.copyWith(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // Arrow Icon
+                              Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(
+                                    AppSizes.radiusSmall,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.arrow_forward_ios,
+                                  color: AppColors.primary,
+                                  size: 16,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
             ),
 
@@ -473,6 +555,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: AppSizes.paddingMedium),
 
+                    // User Role
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSizes.paddingMedium,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(
+                          AppSizes.radiusMedium,
+                        ),
+                        border: Border.all(
+                          color: AppColors.primary.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getRoleIcon(_currentUser?.role),
+                            color: AppColors.primary,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _currentUser?.roleString ?? 'Unknown Role',
+                            style: AppTextStyles.body1.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSizes.paddingMedium),
+
                     // Information Cards
                     _buildDetailCard(
                       icon: Icons.email,
@@ -482,26 +601,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 6),
 
                     if (_currentUser?.phone != null &&
-                        _currentUser!.phone.isNotEmpty)
+                        _currentUser!.phone.isNotEmpty) ...[
                       _buildDetailCard(
                         icon: Icons.phone,
                         title: 'Phone',
                         value: _currentUser!.phone,
                       ),
-                    if (_currentUser?.phone != null &&
-                        _currentUser!.phone.isNotEmpty)
                       const SizedBox(height: 6),
+                    ],
 
                     if (_currentUser?.address != null &&
-                        _currentUser!.address.isNotEmpty)
+                        _currentUser!.address.isNotEmpty) ...[
                       _buildDetailCard(
                         icon: Icons.location_on,
                         title: 'Address',
                         value: _currentUser!.address,
                       ),
-                    if (_currentUser?.address != null &&
-                        _currentUser!.address.isNotEmpty)
                       const SizedBox(height: 6),
+                    ],
 
                     if (_currentUser?.barangay != null &&
                         _currentUser!.barangay.isNotEmpty)
@@ -676,5 +793,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       },
     );
+  }
+
+  IconData _getRoleIcon(UserRole? role) {
+    switch (role) {
+      case UserRole.resident:
+        return Icons.person;
+      case UserRole.barangayOfficial:
+        return Icons.location_city;
+      case UserRole.driver:
+        return Icons.drive_eta;
+      case UserRole.collector:
+        return Icons.handshake;
+      case UserRole.administrator:
+        return Icons.admin_panel_settings;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
+  String _getWelcomeMessage(UserRole? role) {
+    switch (role) {
+      case UserRole.resident:
+        return 'Welcome back, resident!';
+      case UserRole.barangayOfficial:
+        return 'Welcome back, barangay official!';
+      case UserRole.driver:
+        return 'Welcome back, driver!';
+      case UserRole.collector:
+        return 'Welcome back, collector!';
+      case UserRole.administrator:
+        return 'Welcome back, administrator!';
+      default:
+        return 'Welcome back!';
+    }
   }
 }

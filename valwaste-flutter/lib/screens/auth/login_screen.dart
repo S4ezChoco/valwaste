@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
 import '../../services/firebase_auth_service.dart';
+import '../../models/user.dart';
 import '../home/home_screen.dart';
 import 'register_screen.dart';
 
@@ -41,12 +42,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (result['success']) {
         if (mounted) {
-          // Show success message
+          final user = result['user'];
+          final roleMessage = user != null ? ' (${user.roleString})' : '';
+
+          // Show success message with role
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message']),
+              content: Text('${result['message']}$roleMessage'),
               backgroundColor: AppColors.primary,
-              duration: const Duration(seconds: 2),
+              duration: const Duration(seconds: 3),
             ),
           );
 
@@ -86,150 +90,6 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _isLoading = false;
         });
-      }
-    }
-  }
-
-  Future<void> _testFirebaseConnection() async {
-    try {
-      final result = await FirebaseAuthService.testFirebaseConnection();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message']),
-            backgroundColor: result['success']
-                ? AppColors.primary
-                : AppColors.error,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Test failed: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _checkUserExists() async {
-    if (_emailController.text.trim().isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please enter an email first'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-      return;
-    }
-
-    try {
-      final result = await FirebaseAuthService.checkUserExists(
-        _emailController.text.trim(),
-      );
-
-      if (mounted) {
-        if (result['success']) {
-          if (result['exists']) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('User found: ${result['userData']['name']}'),
-                backgroundColor: AppColors.primary,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('User not found in Firestore'),
-                backgroundColor: AppColors.error,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message']),
-              backgroundColor: AppColors.error,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Check failed: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _createTestUser() async {
-    try {
-      final result = await FirebaseAuthService.createTestUserInFirestore();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message']),
-            backgroundColor: result['success']
-                ? AppColors.primary
-                : AppColors.error,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Create test user failed: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _createUserDataForAuth() async {
-    try {
-      final result = await FirebaseAuthService.createUserInFirestore(
-        name: 'Test User',
-        email: 'test@example.com',
-        phone: '1234567890',
-        address: 'Test Address',
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message']),
-            backgroundColor: result['success']
-                ? AppColors.primary
-                : AppColors.error,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Create user data for auth user failed: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
       }
     }
   }
@@ -386,100 +246,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
 
                 const SizedBox(height: AppSizes.paddingLarge),
-
-                // Debug Button (temporary)
-                if (true) // Set to false to hide debug button
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _testFirebaseConnection,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppSizes.paddingSmall,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppSizes.radiusMedium,
-                        ),
-                      ),
-                    ),
-                    child: Text(
-                      'Test Firebase Connection',
-                      style: AppTextStyles.button,
-                    ),
-                  ),
-
-                const SizedBox(height: AppSizes.paddingSmall),
-
-                // Check User Exists Button (temporary)
-                if (true) // Set to false to hide debug button
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _checkUserExists,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppSizes.paddingSmall,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppSizes.radiusMedium,
-                        ),
-                      ),
-                    ),
-                    child: Text(
-                      'Check User in Firestore',
-                      style: AppTextStyles.button,
-                    ),
-                  ),
-
-                const SizedBox(height: AppSizes.paddingSmall),
-
-                // Create Test User Button (temporary)
-                if (true) // Set to false to hide debug button
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _createTestUser,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppSizes.paddingSmall,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppSizes.radiusMedium,
-                        ),
-                      ),
-                    ),
-                    child: Text(
-                      'Create Test User in Firestore',
-                      style: AppTextStyles.button,
-                    ),
-                  ),
-
-                const SizedBox(height: AppSizes.paddingSmall),
-
-                // Create User Data for Auth User Button (temporary)
-                if (true) // Set to false to hide debug button
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _createUserDataForAuth,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppSizes.paddingSmall,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppSizes.radiusMedium,
-                        ),
-                      ),
-                    ),
-                    child: Text(
-                      'Create User Data for Auth User',
-                      style: AppTextStyles.button,
-                    ),
-                  ),
 
                 const SizedBox(height: AppSizes.paddingLarge),
 

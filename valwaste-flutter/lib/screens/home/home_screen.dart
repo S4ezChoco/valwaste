@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
+import '../../services/firebase_auth_service.dart';
+import '../../models/user.dart';
 import '../schedule/schedule_screen.dart';
 import '../history/history_screen.dart';
 import '../profile/profile_screen.dart';
 import '../collection/collection_request_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../map/map_screen.dart';
+import '../guide/recycling_guide_screen.dart';
+import 'resident_dashboard_screen.dart';
+import 'barangay_official_dashboard_screen.dart';
+import 'driver_dashboard_screen.dart';
+import 'collector_dashboard_screen.dart';
+import 'administrator_dashboard_screen.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -19,20 +27,109 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   late PageController _pageController;
-
-  final List<Widget> _screens = [
-    const _DashboardScreen(),
-    const ScheduleScreen(),
-    const MapScreen(),
-    const HistoryScreen(),
-    const NotificationsScreen(),
-    const ProfileScreen(),
-  ];
+  late List<Widget> _screens;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _initializeScreens();
     _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  void _initializeScreens() async {
+    print('HomeScreen: Initializing screens...');
+
+    // Try to get current user with refresh
+    final currentUser = await FirebaseAuthService.getCurrentUserWithRefresh();
+    print('HomeScreen: Current user: ${currentUser?.email ?? 'null'}');
+    print('HomeScreen: User role: ${currentUser?.roleString ?? 'null'}');
+
+    if (currentUser == null) {
+      // Default screens if no user (shouldn't happen)
+      print('HomeScreen: No current user found, using default screens');
+      _screens = [
+        const ResidentDashboardScreen(),
+        const ScheduleScreen(),
+        const MapScreen(),
+        const RecyclingGuideScreen(),
+        const ProfileScreen(),
+      ];
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
+    print('HomeScreen: Setting up screens for role: ${currentUser.roleString}');
+    switch (currentUser.role) {
+      case UserRole.resident:
+        print('HomeScreen: Initializing Resident dashboard');
+        // Resident features: Dashboard, Schedule, Map, Recycling Guide, Profile
+        _screens = [
+          const ResidentDashboardScreen(),
+          const ScheduleScreen(),
+          const MapScreen(),
+          const RecyclingGuideScreen(),
+          const ProfileScreen(),
+        ];
+        break;
+      case UserRole.barangayOfficial:
+        print('HomeScreen: Initializing Barangay Official dashboard');
+        // Barangay Official features: Dashboard, Collection Requests, Map, Profile
+        _screens = [
+          const BarangayOfficialDashboardScreen(),
+          const CollectionRequestScreen(),
+          const MapScreen(),
+          const ProfileScreen(),
+        ];
+        break;
+      case UserRole.driver:
+        print('HomeScreen: Initializing Driver dashboard');
+        // Driver features: Dashboard, Schedule, Map, Profile
+        _screens = [
+          const DriverDashboardScreen(),
+          const ScheduleScreen(),
+          const MapScreen(),
+          const ProfileScreen(),
+        ];
+        break;
+      case UserRole.collector:
+        print('HomeScreen: Initializing Collector dashboard');
+        // Collector features: Dashboard, Schedule, Map, Profile
+        _screens = [
+          const CollectorDashboardScreen(),
+          const ScheduleScreen(),
+          const MapScreen(),
+          const ProfileScreen(),
+        ];
+        break;
+      case UserRole.administrator:
+        print('HomeScreen: Initializing Administrator dashboard');
+        // Administrator features: Dashboard, Collection Requests, Map, Profile
+        _screens = [
+          const AdministratorDashboardScreen(),
+          const CollectionRequestScreen(),
+          const MapScreen(),
+          const ProfileScreen(),
+        ];
+        break;
+      default:
+        print('HomeScreen: Unknown role, using Resident screens');
+        _screens = [
+          const ResidentDashboardScreen(),
+          const ScheduleScreen(),
+          const MapScreen(),
+          const RecyclingGuideScreen(),
+          const ProfileScreen(),
+        ];
+        break;
+    }
+    print('HomeScreen: Screens initialized with ${_screens.length} screens');
+
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   @override
@@ -52,8 +149,227 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  List<BottomNavigationBarItem> _getBottomNavItems() {
+    final currentUser = FirebaseAuthService.currentUser;
+    print(
+      'HomeScreen: Getting bottom nav items for user: ${currentUser?.email ?? 'null'}',
+    );
+    print('HomeScreen: User role: ${currentUser?.roleString ?? 'null'}');
+
+    if (currentUser == null) {
+      print('HomeScreen: No current user, returning default nav items');
+      return _getDefaultNavItems();
+    }
+
+    switch (currentUser.role) {
+      case UserRole.resident:
+        print('HomeScreen: Returning Resident nav items (5 items)');
+        return [
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.schedule_outlined),
+            activeIcon: Icon(Icons.schedule),
+            label: 'Schedule',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.map_outlined),
+            activeIcon: Icon(Icons.map),
+            label: 'Map',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.recycling_outlined),
+            activeIcon: Icon(Icons.recycling),
+            label: 'Guide',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ];
+      case UserRole.barangayOfficial:
+        print('HomeScreen: Returning Barangay Official nav items (4 items)');
+        return [
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Dashboard',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.assignment_outlined),
+            activeIcon: Icon(Icons.assignment),
+            label: 'Requests',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.map_outlined),
+            activeIcon: Icon(Icons.map),
+            label: 'Map',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ];
+      case UserRole.driver:
+        print('HomeScreen: Returning Driver nav items (4 items)');
+        return [
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Dashboard',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.schedule_outlined),
+            activeIcon: Icon(Icons.schedule),
+            label: 'Schedule',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.map_outlined),
+            activeIcon: Icon(Icons.map),
+            label: 'Map',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ];
+      case UserRole.collector:
+        print('HomeScreen: Returning Collector nav items (4 items)');
+        return [
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Dashboard',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.schedule_outlined),
+            activeIcon: Icon(Icons.schedule),
+            label: 'Schedule',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.map_outlined),
+            activeIcon: Icon(Icons.map),
+            label: 'Map',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ];
+      case UserRole.administrator:
+        print('HomeScreen: Returning Administrator nav items (4 items)');
+        return [
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Dashboard',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.assignment_outlined),
+            activeIcon: Icon(Icons.assignment),
+            label: 'Requests',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.map_outlined),
+            activeIcon: Icon(Icons.map),
+            label: 'Map',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ];
+      default:
+        print('HomeScreen: Unknown role, returning default nav items');
+        return _getDefaultNavItems();
+    }
+  }
+
+  List<BottomNavigationBarItem> _getDefaultNavItems() {
+    return [
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.home_outlined),
+        activeIcon: Icon(Icons.home),
+        label: 'Home',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.schedule_outlined),
+        activeIcon: Icon(Icons.schedule),
+        label: 'Schedule',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.map_outlined),
+        activeIcon: Icon(Icons.map),
+        label: 'Map',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.recycling_outlined),
+        activeIcon: Icon(Icons.recycling),
+        label: 'Guide',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.person_outline),
+        activeIcon: Icon(Icons.person),
+        label: 'Profile',
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Debug: Print current user info
+    final currentUser = FirebaseAuthService.currentUser;
+    print('HomeScreen build: Current user: ${currentUser?.email ?? 'null'}');
+    print('HomeScreen build: User role: ${currentUser?.roleString ?? 'null'}');
+    print('HomeScreen build: Screens count: ${_screens.length}');
+    print('HomeScreen build: Current index: $_currentIndex');
+
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.primary, width: 3),
+                ),
+                child: const Icon(
+                  Icons.recycling,
+                  size: 50,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Loading your dashboard...',
+                style: AppTextStyles.body1.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       body: PageView(
         controller: _pageController,
@@ -64,55 +380,110 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         children: _screens,
       ),
-      bottomNavigationBar: Container(
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _currentIndex,
+        onTap: _onTabTapped,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: AppColors.textSecondary,
+        backgroundColor: Colors.white,
+        elevation: 8,
+        items: _getBottomNavItems(),
+      ),
+    );
+  }
+}
+
+// Default Dashboard Screen (fallback)
+class _DashboardScreen extends StatelessWidget {
+  const _DashboardScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.home, size: 64, color: AppColors.primary),
+              const SizedBox(height: AppSizes.paddingLarge),
+              Text(
+                'Welcome to ValWaste',
+                style: AppTextStyles.heading1.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: AppSizes.paddingMedium),
+              Text(
+                'Please log in to access your dashboard',
+                style: AppTextStyles.body1.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Helper Widgets
+class _ActionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(AppSizes.paddingMedium),
         decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+          border: Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: AppColors.surface,
-          selectedItemColor: AppColors.primary,
-          unselectedItemColor: AppColors.textSecondary,
-          currentIndex: _currentIndex,
-          onTap: _onTabTapped,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home',
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 32, color: color),
+            const SizedBox(height: AppSizes.paddingSmall),
+            Text(
+              title,
+              style: AppTextStyles.body1.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.schedule_outlined),
-              activeIcon: Icon(Icons.schedule),
-              label: 'Schedule',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.map_outlined),
-              activeIcon: Icon(Icons.map),
-              label: 'Map',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.description_outlined),
-              activeIcon: Icon(Icons.description),
-              label: 'Report',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.notifications_outlined),
-              activeIcon: Icon(Icons.notifications),
-              label: 'Notifications',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Profile',
+            const SizedBox(height: AppSizes.paddingSmall),
+            Text(
+              subtitle,
+              style: AppTextStyles.body2.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -121,509 +492,336 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _DashboardScreen extends StatefulWidget {
-  const _DashboardScreen({super.key});
+class _StatCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
 
-  @override
-  State<_DashboardScreen> createState() => _DashboardScreenState();
-}
+  const _StatCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
 
-class _DashboardScreenState extends State<_DashboardScreen> {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Container(
-        padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
-        child: SingleChildScrollView(
-          child: Column(
+    return Container(
+      padding: const EdgeInsets.all(AppSizes.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              // Header with ValWaste logo
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                decoration: const BoxDecoration(color: AppColors.primary),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSizes.paddingMedium,
-                        vertical: AppSizes.paddingSmall,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(
-                          AppSizes.radiusSmall,
-                        ),
-                      ),
-                      child: Text(
-                        'ValWaste',
-                        style: AppTextStyles.heading3.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // User Welcome Section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppSizes.paddingLarge),
-                decoration: const BoxDecoration(color: AppColors.primary),
-                child: Row(
-                  children: [
-                    // Profile Picture
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.person,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-                    ),
-                    const SizedBox(width: AppSizes.paddingMedium),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Welcome back, User!',
-                            style: AppTextStyles.heading2.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: AppSizes.paddingSmall),
-                          Text(
-                            'Resident of Valenzuela City',
-                            style: AppTextStyles.body1.copyWith(
-                              color: Colors.white.withOpacity(0.9),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Next Collection Section
-              Container(
-                margin: const EdgeInsets.all(AppSizes.paddingMedium),
-                padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 5,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Next Collection',
-                      style: AppTextStyles.heading3.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: AppSizes.paddingSmall),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          color: AppColors.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: AppSizes.paddingSmall),
-                        Text('Valenzuela City', style: AppTextStyles.body1),
-                      ],
-                    ),
-                    const SizedBox(height: AppSizes.paddingSmall),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.calendar_today,
-                          color: AppColors.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: AppSizes.paddingSmall),
-                        Text('April 25, 6AM - 8AM', style: AppTextStyles.body1),
-                      ],
-                    ),
-                    const SizedBox(height: AppSizes.paddingMedium),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Navigate to schedule screen
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => const ScheduleScreen(),
-                                ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  AppSizes.radiusSmall,
-                                ),
-                              ),
-                            ),
-                            child: const Text('View Full Schedule'),
-                          ),
-                        ),
-                        const SizedBox(width: AppSizes.paddingSmall),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Navigate to collection request screen
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const CollectionRequestScreen(),
-                                ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.secondary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  AppSizes.radiusSmall,
-                                ),
-                              ),
-                            ),
-                            child: const Text('Request Pickup'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Map Section
-              GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => const MapScreen()),
-                  );
-                },
-                child: Container(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.paddingMedium,
+              Icon(icon, color: color, size: 24),
+              const SizedBox(width: AppSizes.paddingSmall),
+              Expanded(
+                child: Text(
+                  title,
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
                   ),
-                  height: 200,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 5,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                    child: Stack(
-                      children: [
-                        // Real OpenStreetMap
-                        FlutterMap(
-                          options: MapOptions(
-                            initialCenter: const LatLng(
-                              14.7000,
-                              120.9833,
-                            ), // Valenzuela City
-                            initialZoom: 12.0,
-                            interactionOptions: const InteractionOptions(
-                              flags: InteractiveFlag.all,
-                            ),
-                          ),
-                          children: [
-                            TileLayer(
-                              urlTemplate:
-                                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                              userAgentPackageName: 'com.example.valwaste',
-                              maxZoom: 19,
-                            ),
-                            // Sample waste collection points in Valenzuela City
-                            MarkerLayer(
-                              markers: [
-                                Marker(
-                                  point: const LatLng(
-                                    14.7000,
-                                    120.9833,
-                                  ), // Valenzuela City Hall
-                                  width: 30,
-                                  height: 30,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(0.8),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: const Icon(
-                                      Icons.delete,
-                                      color: Colors.white,
-                                      size: 15,
-                                    ),
-                                  ),
-                                ),
-                                Marker(
-                                  point: const LatLng(
-                                    14.7100,
-                                    120.9900,
-                                  ), // Malanday Collection Center
-                                  width: 30,
-                                  height: 30,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(0.8),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: const Icon(
-                                      Icons.recycling,
-                                      color: Colors.white,
-                                      size: 15,
-                                    ),
-                                  ),
-                                ),
-                                Marker(
-                                  point: const LatLng(
-                                    14.6900,
-                                    120.9750,
-                                  ), // Marulas Waste Facility
-                                  width: 30,
-                                  height: 30,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(0.8),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: const Icon(
-                                      Icons.location_on,
-                                      color: Colors.white,
-                                      size: 15,
-                                    ),
-                                  ),
-                                ),
-                                Marker(
-                                  point: const LatLng(
-                                    14.7050,
-                                    120.9700,
-                                  ), // Karuhatan Collection Point
-                                  width: 30,
-                                  height: 30,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(0.8),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: const Icon(
-                                      Icons.delete,
-                                      color: Colors.white,
-                                      size: 15,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        // Zoom controls
-                        Positioned(
-                          top: 50,
-                          right: AppSizes.paddingMedium,
-                          child: Column(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.add, size: 20),
-                                      onPressed: () {
-                                        // Zoom in functionality
-                                      },
-                                      padding: const EdgeInsets.all(8),
-                                    ),
-                                    Container(
-                                      height: 1,
-                                      color: Colors.grey[300],
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.remove, size: 20),
-                                      onPressed: () {
-                                        // Zoom out functionality
-                                      },
-                                      padding: const EdgeInsets.all(8),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Overlay with tap instruction
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSizes.paddingSmall,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: const BorderRadius.only(
-                                topLeft: Radius.circular(AppSizes.radiusMedium),
-                                topRight: Radius.circular(
-                                  AppSizes.radiusMedium,
-                                ),
-                              ),
-                            ),
-                            child: const Text(
-                              'Interactive Map - Tap for full view',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                        // Location indicator
-                        Positioned(
-                          bottom: AppSizes.paddingMedium,
-                          right: AppSizes.paddingMedium,
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.my_location,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              // Latest Announcement
-              Container(
-                margin: const EdgeInsets.all(AppSizes.paddingMedium),
-                padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 5,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.purple.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(
-                          AppSizes.radiusSmall,
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.campaign,
-                        color: Colors.purple,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: AppSizes.paddingMedium),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Latest Announcement!',
-                            style: AppTextStyles.body1.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: AppSizes.paddingSmall),
-                          Text(
-                            'Important updates about waste collection schedule...',
-                            style: AppTextStyles.body2,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: AppSizes.paddingSmall),
+          Text(
+            value,
+            style: AppTextStyles.heading2.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final String time;
+  final IconData icon;
+  final Color color;
+
+  const _ActivityCard({
+    required this.title,
+    required this.subtitle,
+    required this.time,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSizes.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(width: AppSizes.paddingMedium),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.body1.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            time,
+            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RequestCard extends StatelessWidget {
+  final String residentName;
+  final String address;
+  final String requestType;
+  final String status;
+  final String time;
+
+  const _RequestCard({
+    required this.residentName,
+    required this.address,
+    required this.requestType,
+    required this.status,
+    required this.time,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSizes.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  residentName,
+                  style: AppTextStyles.body1.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSizes.paddingSmall,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: status == 'Pending' ? Colors.orange : Colors.green,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  status,
+                  style: AppTextStyles.body2.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSizes.paddingSmall),
+          Text(
+            address,
+            style: AppTextStyles.body2.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: AppSizes.paddingSmall),
+          Row(
+            children: [
+              Text(
+                requestType,
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                time,
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CollectionCard extends StatelessWidget {
+  final String address;
+  final String time;
+  final String status;
+  final String wasteType;
+
+  const _CollectionCard({
+    required this.address,
+    required this.time,
+    required this.status,
+    required this.wasteType,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSizes.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.recycling, color: Colors.green, size: 24),
+          const SizedBox(width: AppSizes.paddingMedium),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  address,
+                  style: AppTextStyles.body1.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  '$wasteType • $time',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSizes.paddingSmall,
+              vertical: 4,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.green,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              status,
+              style: AppTextStyles.body2.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StopCard extends StatelessWidget {
+  final String address;
+  final String time;
+  final String wasteType;
+  final String status;
+
+  const _StopCard({
+    required this.address,
+    required this.time,
+    required this.wasteType,
+    required this.status,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSizes.paddingMedium),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.location_on, color: AppColors.primary, size: 24),
+          const SizedBox(width: AppSizes.paddingMedium),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  address,
+                  style: AppTextStyles.body1.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  '$wasteType • $time',
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSizes.paddingSmall,
+              vertical: 4,
+            ),
+            decoration: BoxDecoration(
+              color: status == 'Pending' ? Colors.orange : Colors.green,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              status,
+              style: AppTextStyles.body2.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
