@@ -74,15 +74,47 @@
             color: #374151;
         }
         
-        /* Traffic toggle button styling */
-        #toggleTraffic.active {
+        /* Map control button styling */
+        .map-control-btn.active {
             background: rgba(59, 130, 246, 0.2);
             color: #3B82F6;
             border-color: rgba(59, 130, 246, 0.3);
         }
         
-        #toggleTraffic.active svg {
+        .map-control-btn.active svg {
             stroke: #3B82F6;
+        }
+        
+        /* Driver marker styling */
+        .driver-marker {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            pointer-events: auto;
+        }
+        
+        .driver-marker:hover {
+            transform: translate(-50%, -50%) scale(1.1);
+            transition: transform 0.1s ease;
+        }
+        
+        .driver-marker.online {
+            background: #10B981;
+        }
+        
+        .driver-marker.offline {
+            background: #6B7280;
         }
     </style>
 </head>
@@ -226,7 +258,20 @@
                                         <polygon points="3,11 22,2 13,21 11,13 3,11"></polygon>
                                     </svg>
                                 </button>
-                                <button id="refreshPins" class="map-control-btn" title="Refresh Truck Locations">
+                                <button id="toggleDrivers" class="map-control-btn" title="Toggle Driver Locations">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="12" cy="7" r="4"></circle>
+                                    </svg>
+                                </button>
+                                <button id="toggleRealtime" class="map-control-btn" title="Toggle Real-time Updates (10s)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="23 4 23 10 17 10"></polyline>
+                                        <polyline points="1 20 1 14 7 14"></polyline>
+                                        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+                                    </svg>
+                                </button>
+                                <button id="refreshPins" class="map-control-btn" title="Refresh All Locations">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <polyline points="23 4 23 10 17 10"></polyline>
                                         <polyline points="1 20 1 14 7 14"></polyline>
@@ -454,7 +499,11 @@
         let isSatelliteEnabled = false;
         let isFullscreenEnabled = false;
         let truckMarkers = [];
+        let driverMarkers = [];
         let scheduleData = [];
+        let isDriversVisible = false;
+        let isRealtimeEnabled = false;
+        let realtimeInterval = null;
 
         // MapTiler API key
         const MAPTILER_KEY = 'Kr1k642bLPyqdCL0A5yM';
@@ -515,20 +564,11 @@
             // Valenzuela City center coordinates
             const center = [120.97, 14.72]; // Note: MapLibre uses [lng, lat]
             
-            // Philippines bounds [southwest, northeast]
-            const philippinesBounds = [
-                [116.0, 4.5],  // Southwest coordinates
-                [127.0, 21.0]  // Northeast coordinates
-            ];
-            
             map = new maplibregl.Map({
                 container: 'map',
                 style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`,
                 center: center,
                 zoom: 12,
-                minZoom: 5,
-                maxZoom: 18,
-                maxBounds: philippinesBounds,
                 pitch: 0,
                 bearing: 0,
                 antialias: true,
@@ -552,6 +592,9 @@
             map.on('load', () => {
                 // Load truck schedules and add markers
                 loadTruckSchedules();
+                
+                // Load driver locations
+                loadDriverLocations();
 
                 // Setup 3D buildings layer (initially hidden)
                 setupBuildingsLayer();
@@ -581,6 +624,142 @@
                 console.error('Error loading truck schedules:', error);
             });
         }
+        
+        // Load driver locations from Firebase
+        function loadDriverLocations() {
+            console.log('Loading driver locations from Firebase...');
+            console.log('isDriversVisible:', isDriversVisible);
+            
+            if (!isDriversVisible) {
+                console.log('Drivers not visible, skipping load');
+                return;
+            }
+            
+            // Get all users and filter locally to handle different role formats
+            db.collection('users').get().then((snapshot) => {
+                console.log('Found total user documents:', snapshot.size);
+                const driverLocations = [];
+                
+                snapshot.forEach((doc) => {
+                    const userData = doc.data();
+                    const role = userData.role;
+                    
+                    // Check for various role formats
+                    if (role && (
+                        role === 'Driver' || 
+                        role === 'driver' || 
+                        role.toLowerCase() === 'driver' ||
+                        role.includes('Driver') ||
+                        role.includes('driver')
+                    )) {
+                        console.log('Found driver user:', userData.firstName, userData.lastName, 'Role:', role);
+                        
+                        // Check if driver has location object with latitude and longitude
+                        if (userData.location && userData.location.latitude && userData.location.longitude) {
+                            console.log('Driver has coordinates:', userData.location.latitude, userData.location.longitude);
+                            driverLocations.push({ id: doc.id, ...userData });
+                        } else {
+                            console.log('Driver missing coordinates:', userData.firstName, userData.lastName);
+                        }
+                    }
+                });
+                
+                console.log('Filtered driver locations:', driverLocations.length, driverLocations);
+                addDriverMarkers(driverLocations);
+            }).catch((error) => {
+                console.error('Error loading driver locations:', error);
+            });
+        }
+        
+        // Add driver markers to map
+        function addDriverMarkers(driverLocations) {
+            console.log('addDriverMarkers called with:', driverLocations.length, 'drivers');
+            console.log('isDriversVisible:', isDriversVisible);
+            console.log('map object:', map);
+            
+            // Clear existing driver markers
+            driverMarkers.forEach(marker => marker.remove());
+            driverMarkers = [];
+            
+            if (!isDriversVisible) {
+                console.log('Drivers not visible, not adding markers');
+                return;
+            }
+            
+            driverLocations.forEach((driver, index) => {
+                console.log(`Processing driver ${index + 1}:`, driver);
+                
+                if (driver.location && driver.location.latitude && driver.location.longitude) {
+                    console.log('Driver has valid coordinates:', driver.location.latitude, driver.location.longitude);
+                    
+                    const el = document.createElement('div');
+                    el.className = 'driver-marker';
+                    
+                    // Determine if driver is online (last update within 5 minutes)
+                    const now = new Date();
+                    const lastUpdate = driver.location.lastUpdated ? new Date(driver.location.lastUpdated) : new Date(0);
+                    const timeDiff = (now - lastUpdate) / (1000 * 60); // minutes
+                    const isOnline = timeDiff <= 5;
+                    
+                    el.classList.add(isOnline ? 'online' : 'offline');
+                    
+                    // Show first letter of first name
+                    const firstLetter = driver.firstName ? driver.firstName.charAt(0).toUpperCase() : 'D';
+                    el.textContent = firstLetter;
+                    
+                    console.log('Creating marker for driver:', firstLetter, isOnline ? 'online' : 'offline');
+                    
+                    // Create detailed popup
+                    const status = isOnline ? 'Online' : 'Offline';
+                    const lastUpdateText = driver.location.lastUpdated ? 
+                        new Date(driver.location.lastUpdated).toLocaleString() : 'Never';
+                    const accuracy = driver.location.accuracy ? `${Math.round(driver.location.accuracy)}m` : 'Unknown';
+                    const speed = driver.location.speed ? `${Math.round(driver.location.speed * 3.6)} km/h` : '0 km/h';
+                    
+                    const popup = new maplibregl.Popup({ offset: 25 })
+                        .setHTML(`
+                            <div style="min-width: 220px;">
+                                <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                    <div class="driver-marker ${isOnline ? 'online' : 'offline'}" style="width: 20px; height: 20px; font-size: 10px; margin-right: 8px;">${firstLetter}</div>
+                                    <strong>${driver.firstName || 'Unknown'} ${driver.lastName || 'Driver'}</strong>
+                                </div>
+                                <div style="font-size: 13px; color: #374151; line-height: 1.4;">
+                                    <div><strong>Status:</strong> <span style="color: ${isOnline ? '#10B981' : '#6B7280'}">${status}</span></div>
+                                    <div><strong>Role:</strong> ${driver.role}</div>
+                                    <div><strong>Email:</strong> ${driver.email || 'Not provided'}</div>
+                                    <div><strong>Last Update:</strong> ${lastUpdateText}</div>
+                                    <div><strong>Accuracy:</strong> ${accuracy}</div>
+                                    <div><strong>Speed:</strong> ${speed}</div>
+                                    <div><strong>Coordinates:</strong> ${driver.location.latitude.toFixed(6)}, ${driver.location.longitude.toFixed(6)}</div>
+                                </div>
+                            </div>
+                        `);
+                    
+                    try {
+                        const marker = new maplibregl.Marker({
+                            element: el,
+                            anchor: 'center',
+                            offset: [0, 0],
+                            pitchAlignment: 'map',
+                            rotationAlignment: 'map'
+                        })
+                            .setLngLat([driver.location.longitude, driver.location.latitude])
+                            .setPopup(popup)
+                            .addTo(map);
+                        
+                        driverMarkers.push(marker);
+                        console.log('Successfully added marker for driver:', firstLetter);
+                    } catch (error) {
+                        console.error('Error creating marker for driver:', firstLetter, error);
+                    }
+                } else {
+                    console.log('Driver missing coordinates:', driver.firstName, driver.lastName);
+                }
+            });
+            
+            console.log('Total driver markers added:', driverMarkers.length);
+        }
+        
 
         function addTruckMarkers() {
             // Clear existing markers
@@ -859,9 +1038,57 @@
                 }
             });
 
+            // Driver Toggle
+            document.getElementById('toggleDrivers').addEventListener('click', () => {
+                console.log('Driver toggle clicked! Current state:', isDriversVisible);
+                isDriversVisible = !isDriversVisible;
+                const btn = document.getElementById('toggleDrivers');
+                
+                if (isDriversVisible) {
+                    console.log('Enabling driver visibility...');
+                    btn.classList.add('active');
+                    loadDriverLocations();
+                } else {
+                    console.log('Disabling driver visibility...');
+                    btn.classList.remove('active');
+                    // Clear driver markers
+                    driverMarkers.forEach(marker => marker.remove());
+                    driverMarkers = [];
+                }
+            });
+            
+            // Real-time Toggle
+            document.getElementById('toggleRealtime').addEventListener('click', () => {
+                isRealtimeEnabled = !isRealtimeEnabled;
+                const btn = document.getElementById('toggleRealtime');
+                
+                if (isRealtimeEnabled) {
+                    btn.classList.add('active');
+                    // Start real-time updates every 10 seconds
+                    realtimeInterval = setInterval(() => {
+                        if (isDriversVisible) {
+                            loadDriverLocations();
+                        }
+                        loadTruckSchedules();
+                    }, 10000);
+                    
+                    console.log('Real-time updates enabled (10s interval)');
+                } else {
+                    btn.classList.remove('active');
+                    if (realtimeInterval) {
+                        clearInterval(realtimeInterval);
+                        realtimeInterval = null;
+                    }
+                    console.log('Real-time updates disabled');
+                }
+            });
+
             // Refresh Pins Toggle
             document.getElementById('refreshPins').addEventListener('click', () => {
                 loadTruckSchedules();
+                if (isDriversVisible) {
+                    loadDriverLocations();
+                }
                 // Visual feedback
                 const btn = document.getElementById('refreshPins');
                 btn.style.transform = 'rotate(360deg)';
@@ -886,6 +1113,9 @@
                 // Re-add markers, buildings, and traffic after style change
                 map.once('styledata', () => {
                     loadTruckSchedules();
+                    if (isDriversVisible) {
+                        loadDriverLocations();
+                    }
                     hideDuplicateLabels(); // Hide duplicate labels on style change
                     if (isBuildingsEnabled) {
                         setupBuildingsLayer();
