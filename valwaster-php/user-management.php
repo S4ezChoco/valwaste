@@ -144,7 +144,7 @@
                         </div>
                         
                         <div class="um-field">
-                            <label class="um-label">Barangay</label>
+                            <label class="um-label" id="barangayLabel">Barangay <span id="barangayRequired" style="color: #dc2626; display: none;">*</span></label>
                             <div class="um-select-wrap">
                                 <select class="um-select" name="barangay" id="userBarangay">
                                     <option value="">Select Barangay</option>

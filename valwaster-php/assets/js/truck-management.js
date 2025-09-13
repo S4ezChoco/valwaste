@@ -126,6 +126,10 @@ function createTruckCard(truck) {
                     <span class="label">Capacity:</span>
                     <span class="value">${truck.capacity} tons</span>
                 </div>
+                <div class="truck-detail">
+                    <span class="label">Specification:</span>
+                    <span class="value" style="font-weight: 600; color: ${truck.specification === 'Large' ? '#059669' : '#d97706'};">${truck.specification || 'Not specified'}</span>
+                </div>
                 ${truck.model ? `
                     <div class="truck-detail">
                         <span class="label">Model/Year:</span>
@@ -223,6 +227,7 @@ async function handleAddTruck(event) {
         name: document.getElementById('truck-name').value.trim(),
         licensePlate: document.getElementById('truck-plate').value.trim(),
         capacity: parseFloat(document.getElementById('truck-capacity').value),
+        specification: document.getElementById('truck-specification').value,
         model: document.getElementById('truck-model').value.trim(),
         status: document.getElementById('truck-status').value,
         notes: document.getElementById('truck-notes').value.trim(),
@@ -264,6 +269,7 @@ async function editTruck(truckId) {
     document.getElementById('edit-truck-name').value = truck.name;
     document.getElementById('edit-truck-plate').value = truck.licensePlate;
     document.getElementById('edit-truck-capacity').value = truck.capacity;
+    document.getElementById('edit-truck-specification').value = truck.specification || '';
     document.getElementById('edit-truck-model').value = truck.model || '';
     document.getElementById('edit-truck-status').value = truck.status;
     document.getElementById('edit-truck-notes').value = truck.notes || '';
@@ -279,6 +285,7 @@ async function handleEditTruck(event) {
         name: document.getElementById('edit-truck-name').value.trim(),
         licensePlate: document.getElementById('edit-truck-plate').value.trim(),
         capacity: parseFloat(document.getElementById('edit-truck-capacity').value),
+        specification: document.getElementById('edit-truck-specification').value,
         model: document.getElementById('edit-truck-model').value.trim(),
         status: document.getElementById('edit-truck-status').value,
         notes: document.getElementById('edit-truck-notes').value.trim(),

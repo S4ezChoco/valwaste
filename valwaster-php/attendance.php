@@ -84,7 +84,7 @@
                                 </tr>
                             </thead>
                             <tbody id="attendance-table-body">
-                                <!-- Sample data will be populated here -->
+                                <!-- Data will be populated from Firebase/database -->
                             </tbody>
                         </table>
                     </div>
@@ -187,9 +187,7 @@
                     <div class="um-select-wrap">
                         <select class="um-select" id="driver-select" required>
                             <option value="" disabled selected>Select a driver</option>
-                            <option value="John Doe">John Doe</option>
-                            <option value="Sarah Johnson">Sarah Johnson</option>
-                            <option value="Pedro Reyes">Pedro Reyes</option>
+                            <!-- Options will be populated from Firebase/database -->
                         </select>
                         <svg width="16" height="16" class="um-select-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6,9 12,15 18,9"></polyline>
@@ -203,13 +201,7 @@
                         <div class="um-select-wrap">
                             <select class="um-select" id="member-select">
                                 <option value="" disabled selected>Select team member</option>
-                                <option value="Maria Garcia">Maria Garcia</option>
-                                <option value="Ahmed Ali">Ahmed Ali</option>
-                                <option value="Carlos Rodriguez">Carlos Rodriguez</option>
-                                <option value="Dina">Dina</option>
-                                <option value="Evan">Evan</option>
-                                <option value="Mike Williams">Mike Williams</option>
-                                <option value="Elena Vasquez">Elena Vasquez</option>
+                                <!-- Options will be populated from Firebase/database -->
                             </select>
                             <svg width="16" height="16" class="um-select-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="6,9 12,15 18,9"></polyline>

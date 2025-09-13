@@ -324,6 +324,16 @@ function setupEventListeners() {
     if (roleFilterButton) {
         roleFilterButton.addEventListener('click', toggleRoleFilter);
     }
+    
+    // Role selection change handler for barangay requirement
+    const roleSelect = document.getElementById('userRole');
+    if (roleSelect) {
+        roleSelect.addEventListener('change', function() {
+            updateBarangayRequirement(this.value);
+        });
+        // Set initial state
+        updateBarangayRequirement(roleSelect.value);
+    }
 
     // Close filter when clicking outside
     document.addEventListener('click', function(e) {
@@ -696,6 +706,12 @@ async function handleCreateUser(e) {
         return;
     }
     
+    // Check if barangay is required for Driver and Palero (Waste Collector) roles
+    if ((userData.role === 'Driver' || userData.role === 'Waste Collector') && !userData.barangay) {
+        showError(`Barangay is required for ${userData.role} role.`);
+        return;
+    }
+    
     if (userData.password.length < 6) {
         showError('Password must be at least 6 characters long.');
         return;
@@ -850,6 +866,29 @@ function showError(message) {
         window.showError(message);
     } else {
         alert('Error: ' + message);
+    }
+}
+
+function updateBarangayRequirement(role) {
+    const barangayRequired = document.getElementById('barangayRequired');
+    const barangaySelect = document.getElementById('userBarangay');
+    
+    if (role === 'Driver' || role === 'Waste Collector') {
+        // Show required indicator
+        if (barangayRequired) {
+            barangayRequired.style.display = 'inline';
+        }
+        if (barangaySelect) {
+            barangaySelect.setAttribute('required', 'required');
+        }
+    } else {
+        // Hide required indicator
+        if (barangayRequired) {
+            barangayRequired.style.display = 'none';
+        }
+        if (barangaySelect) {
+            barangaySelect.removeAttribute('required');
+        }
     }
 }
 

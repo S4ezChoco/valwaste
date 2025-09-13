@@ -1,41 +1,7 @@
 // Attendance Management JavaScript
 
-// Sample data
-let attendanceData = [
-    {
-        id: "r1",
-        driver: "John Doe",
-        role: "Driver",
-        teamCount: 3,
-        checkIn: "May 15, 08:00 AM",
-        checkOut: null,
-        status: "pending",
-        members: [
-            { name: "Maria Garcia", role: "Collector" },
-            { name: "Ahmed Ali", role: "Collector" },
-            { name: "Carlos Rodriguez", role: "Palero" }
-        ],
-        location: "Central Waste Facility",
-        notes: "Morning shift, Route A - North sector",
-        expanded: false
-    },
-    {
-        id: "r2",
-        driver: "Sarah Johnson",
-        role: "Driver", 
-        teamCount: 2,
-        checkIn: "May 15, 08:15 AM",
-        checkOut: "May 15, 04:30 PM",
-        status: "verified",
-        members: [
-            { name: "Dina", role: "Collector" },
-            { name: "Evan", role: "Palero" }
-        ],
-        location: "West Transfer Station",
-        notes: "Afternoon shift, Route B",
-        expanded: false
-    }
-];
+// Attendance data - will be populated from Firebase/database
+let attendanceData = [];
 
 let currentTab = "team-records";
 let selectedTeamMembers = [];
@@ -44,8 +10,14 @@ let currentRecord = null;
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
+    // Force clear any cached data and browser storage
+    attendanceData = [];
+    localStorage.removeItem('attendanceData');
+    sessionStorage.removeItem('attendanceData');
+    
     renderAttendanceTable();
     updateCheckOutOptions();
+    updatePendingCount();
 });
 
 // Tab switching
@@ -73,20 +45,19 @@ function switchTab(tab) {
 // Render attendance table
 function renderAttendanceTable() {
     const tbody = document.getElementById('attendance-table-body');
-    const filteredData = currentTab === 'pending-verification' 
-        ? attendanceData.filter(r => r.status === 'pending')
-        : attendanceData;
     
-    if (filteredData.length === 0) {
-        tbody.innerHTML = `
-            <tr class="empty">
-                <td colspan="6" style="text-align: center; color: #6b7280; padding: 40px 12px;">
-                    ${currentTab === 'pending-verification' ? 'No pending records' : 'No records found'}
-                </td>
-            </tr>
-        `;
-        return;
-    }
+    // Force clear the table first
+    tbody.innerHTML = '';
+    
+    // Since attendanceData should always be empty (no mock data), always show empty state
+    tbody.innerHTML = `
+        <tr class="empty">
+            <td colspan="6" style="text-align: center; color: #6b7280; padding: 40px 12px;">
+                ${currentTab === 'pending-verification' ? 'No pending verification records' : 'No attendance records found'}
+            </td>
+        </tr>
+    `;
+    return;
     
     tbody.innerHTML = filteredData.map(record => `
         <tr>

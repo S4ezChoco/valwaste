@@ -270,49 +270,16 @@
                     <aside class="card recent">
                         <h3 class="recent-title">Recent Reports</h3>
                         <div class="recent-list" id="recentReportsList">
-                            <div class="report-row">
-                                <div class="report-main">
-                                    <div class="report-title">Garbage overflow at Main Street</div>
-                                    <div class="report-sub">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                            <circle cx="12" cy="10" r="3"></circle>
-                                        </svg>
-                                        <span>Block 5, Main Street</span>
-                                    </div>
-                                    <div class="report-date">5/12/2023</div>
-                                </div>
-                                <span class="pill pill-pending">Pending</span>
-                            </div>
-
-                            <div class="report-row">
-                                <div class="report-main">
-                                    <div class="report-title">Truck missed scheduled collection</div>
-                                    <div class="report-sub">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                            <circle cx="12" cy="10" r="3"></circle>
-                                        </svg>
-                                        <span>Green Valley Subdivision</span>
-                                    </div>
-                                    <div class="report-date">5/11/2023</div>
-                                </div>
-                                <span class="pill pill-pending">Pending</span>
-                            </div>
-
-                            <div class="report-row">
-                                <div class="report-main">
-                                    <div class="report-title">Illegal dumping spotted</div>
-                                    <div class="report-sub">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                            <circle cx="12" cy="10" r="3"></circle>
-                                        </svg>
-                                        <span>Riverside Park</span>
-                                    </div>
-                                    <div class="report-date">5/11/2023</div>
-                                </div>
-                                <span class="pill pill-pending">Pending</span>
+                            <div class="empty-state" style="padding: 40px 20px; text-align: center; color: #6b7280;">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 16px; opacity: 0.5;">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14,2 14,8 20,8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <polyline points="10,9 9,9 8,9"></polyline>
+                                </svg>
+                                <div style="font-weight: 500; margin-bottom: 4px;">No Recent Reports</div>
+                                <div style="font-size: 14px;">Reports will appear here when submitted by users</div>
                             </div>
                         </div>
                         <button class="btn-outline" type="button" onclick="window.location.href='report-management.php'">
@@ -325,9 +292,19 @@
                 <section class="card annc-card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                         <h4 class="annc-title">Announcements</h4>
-                        <button type="button" class="btn-outline" onclick="editAnnouncement()">
-                            Create Announcement
-                        </button>
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" class="btn-ghost" onclick="openArchiveModal()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
+                                    <polyline points="21,8 21,21 3,21 3,8"></polyline>
+                                    <rect x="1" y="3" width="22" height="5"></rect>
+                                    <line x1="10" y1="12" x2="14" y2="12"></line>
+                                </svg>
+                                Archive
+                            </button>
+                            <button type="button" class="btn-outline" onclick="editAnnouncement()">
+                                Create Announcement
+                            </button>
+                        </div>
                     </div>
                     
                     <div id="announcementSection">
@@ -418,6 +395,31 @@
                 </section>
             </div>
         </main>
+    </div>
+
+    <!-- Archive Modal -->
+    <div id="archiveModal" class="um-modal" style="display: none;" onclick="closeModal(event, 'archiveModal')">
+        <div class="um-modal-card large" role="dialog" aria-modal="true">
+            <button class="um-modal-close" aria-label="Close" onclick="closeArchiveModal()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+
+            <h3 class="um-modal-title">Archived Announcements</h3>
+            <p class="um-modal-sub">View and manage archived announcements</p>
+
+            <div class="archive-content" style="max-height: 400px; overflow-y: auto; margin-top: 16px;">
+                <div id="archivedAnnouncementsList">
+                    <!-- Archived announcements will be loaded here -->
+                </div>
+            </div>
+
+            <div class="um-modal-actions">
+                <button type="button" class="btn-ghost" onclick="closeArchiveModal()">Close</button>
+            </div>
+        </div>
     </div>
 
     <!-- Firebase CDN -->
@@ -1103,14 +1105,23 @@
                     .where('expiresAt', '<=', now)
                     .get();
 
-                const batch = db.batch();
-                expiredSnapshot.docs.forEach(doc => {
-                    batch.delete(doc.ref);
-                });
-
                 if (!expiredSnapshot.empty) {
-                    await batch.commit();
-                    console.log(`Deleted ${expiredSnapshot.size} expired announcements`);
+                    // Archive expired announcements instead of deleting
+                    for (const doc of expiredSnapshot.docs) {
+                        const announcementData = doc.data();
+                        
+                        // Move to archived collection
+                        await db.collection('archived_announcements').doc(doc.id).set({
+                            ...announcementData,
+                            archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            archiveReason: 'Expired automatically',
+                            originalCreatedAt: announcementData.createdAt
+                        });
+
+                        // Delete from active collection
+                        await db.collection('announcements').doc(doc.id).delete();
+                    }
+                    console.log(`Archived ${expiredSnapshot.size} expired announcements`);
                 }
             } catch (error) {
                 console.error('Error cleaning up expired announcements:', error);
@@ -1161,6 +1172,174 @@
                         showSuccess('Announcement deleted successfully!');
                     } catch (error) {
                         console.error('Error deleting announcement:', error);
+                        showError('Error deleting announcement. Please try again.');
+                    }
+                }
+            );
+        }
+
+        // Archive functionality
+        function openArchiveModal() {
+            document.getElementById('archiveModal').style.display = 'flex';
+            loadArchivedAnnouncements();
+        }
+
+        function closeArchiveModal() {
+            document.getElementById('archiveModal').style.display = 'none';
+        }
+
+        function closeModal(event, modalId) {
+            if (event.target.id === modalId) {
+                document.getElementById(modalId).style.display = 'none';
+            }
+        }
+
+        async function loadArchivedAnnouncements() {
+            try {
+                const snapshot = await db.collection('archived_announcements').orderBy('archivedAt', 'desc').get();
+                const archivedList = document.getElementById('archivedAnnouncementsList');
+
+                if (snapshot.empty) {
+                    archivedList.innerHTML = `
+                        <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 16px; opacity: 0.5;">
+                                <polyline points="21,8 21,21 3,21 3,8"></polyline>
+                                <rect x="1" y="3" width="22" height="5"></rect>
+                                <line x1="10" y1="12" x2="14" y2="12"></line>
+                            </svg>
+                            <div style="font-weight: 500; margin-bottom: 4px;">No Archived Announcements</div>
+                            <div style="font-size: 14px;">Expired announcements will appear here</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = '';
+                snapshot.forEach(doc => {
+                    const announcement = doc.data();
+                    const archivedDate = announcement.archivedAt.toDate();
+                    const originalDate = announcement.originalCreatedAt ? announcement.originalCreatedAt.toDate() : archivedDate;
+                    
+                    html += `
+                        <div class="archived-announcement-item" style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px; background: #fafafa;">
+                            <div style="margin-bottom: 8px;">
+                                <div style="font-weight: 600; color: #374151; margin-bottom: 4px;">${announcement.message}</div>
+                                <div style="font-size: 12px; color: #6b7280;">
+                                    <span>Originally created: ${originalDate.toLocaleDateString()} at ${originalDate.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</span>
+                                    <span style="margin-left: 16px;">Archived: ${archivedDate.toLocaleDateString()} at ${archivedDate.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</span>
+                                </div>
+                                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+                                    Reason: ${announcement.archiveReason || 'Expired automatically'}
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="restoreAnnouncement('${doc.id}', '${announcement.message.replace(/'/g, "\\'")}')"
+                                    style="padding: 4px 8px; border: 1px solid #10b981; border-radius: 4px; background: white; cursor: pointer; font-size: 12px; color: #10b981; transition: all 0.2s;"
+                                    onmouseover="this.style.background='#f0fdf4'"
+                                    onmouseout="this.style.background='white'">
+                                    Restore
+                                </button>
+                                <button onclick="permanentlyDeleteAnnouncement('${doc.id}')"
+                                    style="padding: 4px 8px; border: 1px solid #ef4444; border-radius: 4px; background: white; cursor: pointer; font-size: 12px; color: #ef4444; transition: all 0.2s;"
+                                    onmouseover="this.style.background='#fef2f2'"
+                                    onmouseout="this.style.background='white'">
+                                    Delete Permanently
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                archivedList.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading archived announcements:', error);
+                document.getElementById('archivedAnnouncementsList').innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: #ef4444;">
+                        Error loading archived announcements. Please try again.
+                    </div>
+                `;
+            }
+        }
+
+        async function archiveAnnouncement(id, reason = 'Manually archived') {
+            try {
+                // Get the original announcement
+                const announcementDoc = await db.collection('announcements').doc(id).get();
+                if (!announcementDoc.exists) {
+                    console.error('Announcement not found');
+                    return;
+                }
+
+                const announcementData = announcementDoc.data();
+                
+                // Move to archived collection
+                await db.collection('archived_announcements').doc(id).set({
+                    ...announcementData,
+                    archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    archiveReason: reason,
+                    originalCreatedAt: announcementData.createdAt
+                });
+
+                // Delete from active collection
+                await db.collection('announcements').doc(id).delete();
+
+                showSuccess('Announcement archived successfully!');
+            } catch (error) {
+                console.error('Error archiving announcement:', error);
+                showError('Error archiving announcement. Please try again.');
+            }
+        }
+
+        async function restoreAnnouncement(id, message) {
+            showConfirm(
+                'Are you sure you want to restore this announcement? It will become active again.',
+                async () => {
+                    try {
+                        // Get the archived announcement
+                        const archivedDoc = await db.collection('archived_announcements').doc(id).get();
+                        if (!archivedDoc.exists) {
+                            console.error('Archived announcement not found');
+                            return;
+                        }
+
+                        const archivedData = archivedDoc.data();
+                        
+                        // Restore to active collection with new expiry
+                        const duration = 24; // Default 24 hours
+                        const expiresAt = new Date();
+                        expiresAt.setHours(expiresAt.getHours() + duration);
+
+                        await db.collection('announcements').doc(id).set({
+                            message: archivedData.message,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            expiresAt: firebase.firestore.Timestamp.fromDate(expiresAt),
+                            duration: duration,
+                            restoredFrom: archivedData.originalCreatedAt || archivedData.createdAt
+                        });
+
+                        // Delete from archived collection
+                        await db.collection('archived_announcements').doc(id).delete();
+
+                        showSuccess('Announcement restored successfully!');
+                        loadArchivedAnnouncements(); // Refresh archived list
+                    } catch (error) {
+                        console.error('Error restoring announcement:', error);
+                        showError('Error restoring announcement. Please try again.');
+                    }
+                }
+            );
+        }
+
+        async function permanentlyDeleteAnnouncement(id) {
+            showConfirm(
+                'Are you sure you want to permanently delete this announcement? This action cannot be undone.',
+                async () => {
+                    try {
+                        await db.collection('archived_announcements').doc(id).delete();
+                        showSuccess('Announcement permanently deleted!');
+                        loadArchivedAnnouncements(); // Refresh archived list
+                    } catch (error) {
+                        console.error('Error permanently deleting announcement:', error);
                         showError('Error deleting announcement. Please try again.');
                     }
                 }

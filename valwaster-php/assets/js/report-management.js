@@ -20,74 +20,11 @@ const TAB_SUBTITLES = {
     unresolved: 'Reports that could not be resolved and need attention'
 };
 
-// Sample data for demonstration
-const sampleReports = {
-    pending: [
-        {
-            id: 1,
-            title: 'Missed garbage collection',
-            location: 'Barangay Marulas',
-            reportedBy: 'Juan Dela Cruz',
-            priority: 'High',
-            category: 'Missed Collection',
-            date: '2024-01-15',
-            status: 'Pending',
-            description: 'The garbage truck did not arrive at the scheduled time. Residents are complaining about the accumulating waste in the area.',
-            images: ['https://via.placeholder.com/300x300/ff6b6b/ffffff?text=Garbage+Overflow', 'https://via.placeholder.com/300x300/4ecdc4/ffffff?text=Street+View']
-        },
-        {
-            id: 2,
-            title: 'Illegal dumping near park',
-            location: 'Barangay Karuhatan',
-            reportedBy: 'Maria Santos',
-            priority: 'Medium',
-            category: 'Illegal Dumping',
-            date: '2024-01-14',
-            status: 'Pending',
-            description: 'Someone has been dumping construction waste near the children\'s playground. This poses a safety hazard.',
-            images: ['https://via.placeholder.com/300x300/45b7d1/ffffff?text=Illegal+Dump']
-        },
-        {
-            id: 3,
-            title: 'Broken waste bin',
-            location: 'Barangay Gen. T. de Leon',
-            reportedBy: 'Pedro Martinez',
-            priority: 'Low',
-            category: 'Complaint',
-            date: '2024-01-13',
-            status: 'Pending',
-            description: 'The public waste bin on Main Street is damaged and needs replacement.',
-            images: []
-        }
-    ],
-    resolved: [
-        {
-            id: 4,
-            title: 'Overflowing dumpster',
-            location: 'Barangay Paso de Blas',
-            reportedBy: 'Ana Reyes',
-            priority: 'High',
-            category: 'Missed Collection',
-            date: '2024-01-10',
-            status: 'Resolved',
-            description: 'Dumpster was overflowing for several days. Issue has been resolved.',
-            images: ['https://via.placeholder.com/300x300/95e1d3/ffffff?text=Fixed+Dumpster']
-        }
-    ],
-    unresolved: [
-        {
-            id: 5,
-            title: 'Persistent odor issue',
-            location: 'Barangay Arkong Bato',
-            reportedBy: 'Roberto Cruz',
-            priority: 'Medium',
-            category: 'Other',
-            date: '2024-01-08',
-            status: 'Unresolved',
-            description: 'Strong odor persists despite multiple attempts to resolve. May require specialized treatment.',
-            images: []
-        }
-    ]
+// Reports data - will be loaded from Firebase/database
+const reportData = {
+    pending: [],
+    resolved: [],
+    unresolved: []
 };
 
 // Initialize on page load
@@ -217,15 +154,15 @@ function refreshReports() {
 
 // Update report counts
 function updateReportCounts() {
-    document.getElementById('pending-count').textContent = sampleReports.pending.length;
-    document.getElementById('resolved-count').textContent = sampleReports.resolved.length;
-    document.getElementById('unresolved-count').textContent = sampleReports.unresolved.length;
+    document.getElementById('pending-count').textContent = reportData.pending.length;
+    document.getElementById('resolved-count').textContent = reportData.resolved.length;
+    document.getElementById('unresolved-count').textContent = reportData.unresolved.length;
 }
 
 // Display reports based on current filters
 function displayReports() {
     const tbody = document.getElementById('reports-tbody');
-    let reports = sampleReports[currentTab] || [];
+    let reports = reportData[currentTab] || [];
     
     // Apply filters
     if (currentPriority !== 'All Priorities') {
@@ -292,8 +229,8 @@ function getActionButtons(report, tab) {
 
 // Find report by ID across all tabs
 function findReportById(reportId) {
-    for (const tab in sampleReports) {
-        const report = sampleReports[tab].find(r => r.id === reportId);
+    for (const tab in reportData) {
+        const report = reportData[tab].find(r => r.id === reportId);
         if (report) {
             return { report, currentTab: tab };
         }
@@ -438,14 +375,14 @@ function moveReport(reportId, targetStatus) {
     const { report, currentTab } = result;
     
     // Remove from current tab
-    const currentIndex = sampleReports[currentTab].findIndex(r => r.id === reportId);
+    const currentIndex = reportData[currentTab].findIndex(r => r.id === reportId);
     if (currentIndex > -1) {
-        sampleReports[currentTab].splice(currentIndex, 1);
+        reportData[currentTab].splice(currentIndex, 1);
     }
     
     // Update status and add to target tab
     report.status = targetStatus.charAt(0).toUpperCase() + targetStatus.slice(1);
-    sampleReports[targetStatus].push(report);
+    reportData[targetStatus].push(report);
     
     // Update UI
     updateReportCounts();

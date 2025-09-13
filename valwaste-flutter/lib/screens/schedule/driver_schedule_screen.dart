@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/constants.dart';
 import '../../services/firebase_auth_service.dart';
-import '../../services/driver_collection_service.dart';
-import '../../models/waste_collection.dart';
 
 class DriverScheduleScreen extends StatefulWidget {
   const DriverScheduleScreen({super.key});
@@ -13,7 +11,7 @@ class DriverScheduleScreen extends StatefulWidget {
 }
 
 class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
-  List<WasteCollection> _assignedCollections = [];
+  List<Map<String, dynamic>> _assignedSchedules = [];
   bool _isLoading = true;
   String _selectedFilter = 'Today';
   final List<String> _filterOptions = ['Today', 'This Week', 'All'];
@@ -21,10 +19,10 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
   @override
   void initState() {
     super.initState();
-    _loadAssignedCollections();
+    _loadAssignedSchedules();
   }
 
-  Future<void> _loadAssignedCollections() async {
+  Future<void> _loadAssignedSchedules() async {
     setState(() {
       _isLoading = true;
     });
@@ -38,89 +36,189 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
         return;
       }
 
-      // Get collections assigned to this driver
-      final collections = await _getDriverAssignedCollections();
+      // Get truck schedules assigned to this driver
+      final schedules = await _getDriverAssignedSchedules();
 
-      // Filter collections based on selected filter
-      final filteredCollections = _filterCollections(collections);
+      // Filter schedules based on selected filter
+      final filteredSchedules = _filterSchedules(schedules);
 
       setState(() {
-        _assignedCollections = filteredCollections;
+        _assignedSchedules = filteredSchedules;
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading driver collections: $e');
+      print('Error loading driver schedules: $e');
       setState(() {
         _isLoading = false;
       });
     }
   }
 
-  Future<List<WasteCollection>> _getDriverAssignedCollections() async {
+  Future<List<Map<String, dynamic>>> _getDriverAssignedSchedules() async {
     try {
       final currentUser = FirebaseAuthService.currentUser;
       if (currentUser == null) {
         return [];
       }
 
-      // Get collections where assigned_to matches current user
+      print('Fetching schedules for driver: ${currentUser.id}');
+
+      // Get truck schedules where driverId matches current user
       final querySnapshot = await FirebaseFirestore.instance
-          .collection('collections')
-          .where('assigned_to', isEqualTo: currentUser.id)
+          .collection('truck_schedule')
+          .where('driverId', isEqualTo: currentUser.id)
           .get();
 
-      final allCollections = querySnapshot.docs.map((doc) {
+      print('Found ${querySnapshot.docs.length} schedules for driver');
+
+      final allSchedules = querySnapshot.docs.map((doc) {
         final data = doc.data();
         data['id'] = doc.id; // Ensure ID is set
-        return WasteCollection.fromJson(data);
+        return data;
       }).toList();
 
-      // Filter out completed collections in the app
-      final filteredCollections = allCollections.where((collection) {
-        return collection.status == CollectionStatus.approved ||
-            collection.status == CollectionStatus.scheduled ||
-            collection.status == CollectionStatus.inProgress;
+      // Filter out cancelled or completed schedules
+      final activeSchedules = allSchedules.where((schedule) {
+        final status = schedule['status'] ?? 'scheduled';
+        return status == 'scheduled' || status == 'in_progress';
       }).toList();
 
-      // Sort by scheduled date
-      filteredCollections.sort(
-        (a, b) => a.scheduledDate.compareTo(b.scheduledDate),
-      );
+      // Sort by date and start time
+      activeSchedules.sort((a, b) {
+        final dateComparison = (a['date'] ?? '').compareTo(b['date'] ?? '');
+        if (dateComparison != 0) return dateComparison;
+        return (a['startTime'] ?? '').compareTo(b['startTime'] ?? '');
+      });
 
-      return filteredCollections;
+      print('Filtered to ${activeSchedules.length} active schedules');
+      return activeSchedules;
     } catch (e) {
-      print('Error getting driver assigned collections: $e');
+      print('Error getting driver assigned schedules: $e');
       return [];
     }
   }
 
-  List<WasteCollection> _filterCollections(List<WasteCollection> collections) {
+  List<Map<String, dynamic>> _filterSchedules(List<Map<String, dynamic>> schedules) {
     final now = DateTime.now();
+    
+    // Today's date in multiple possible formats to match PHP admin
+    final todayString = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final todayStringAlt = '${now.day}/${now.month}/${now.year}'; // D/M/YYYY format (14/9/2025)
+    final todayStringAlt2 = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}'; // DD/MM/YYYY format
+    
+    print('=== DATE FILTER DEBUG ===');
+    print('Current DateTime: $now');
+    print('Today filter options:');
+    print('  Format 1: "$todayString" (YYYY-MM-DD)');
+    print('  Format 2: "$todayStringAlt" (D/M/YYYY)');
+    print('  Format 3: "$todayStringAlt2" (DD/MM/YYYY)');
+    print('Total schedules: ${schedules.length}');
+    
+    // Print all schedule dates for debugging
+    for (int i = 0; i < schedules.length; i++) {
+      final scheduleData = schedules[i];
+      print('Schedule $i:');
+      print('  date: "${scheduleData['date']}"');
+      print('  driver: "${scheduleData['driver']}"');
+      print('  status: "${scheduleData['status']}"');
+    }
 
     switch (_selectedFilter) {
       case 'Today':
-        final startOfDay = DateTime(now.year, now.month, now.day);
-        final endOfDay = startOfDay.add(const Duration(days: 1));
-        return collections.where((collection) {
-          return collection.scheduledDate.isAfter(startOfDay) &&
-              collection.scheduledDate.isBefore(endOfDay);
+        final todaySchedules = schedules.where((schedule) {
+          final scheduleDate = schedule['date'] ?? '';
+          print('\nChecking schedule date: "$scheduleDate"');
+          
+          if (scheduleDate.isEmpty) {
+            print('  Empty date, skipping');
+            return false;
+          }
+          
+          // Try multiple format matches
+          if (scheduleDate == todayString) {
+            print('  ✅ Exact match with YYYY-MM-DD format');
+            return true;
+          }
+          
+          if (scheduleDate == todayStringAlt) {
+            print('  ✅ Exact match with D/M/YYYY format');
+            return true;
+          }
+          
+          if (scheduleDate == todayStringAlt2) {
+            print('  ✅ Exact match with DD/MM/YYYY format');
+            return true;
+          }
+          
+          // Try parsing the date and comparing
+          try {
+            DateTime? scheduleDateTime;
+            
+            // Try different parsing approaches
+            if (scheduleDate.contains('-')) {
+              // YYYY-MM-DD format
+              scheduleDateTime = DateTime.parse(scheduleDate);
+            } else if (scheduleDate.contains('/')) {
+              // DD/MM/YYYY or D/M/YYYY format
+              final parts = scheduleDate.split('/');
+              if (parts.length == 3) {
+                final day = int.parse(parts[0]);
+                final month = int.parse(parts[1]);
+                final year = int.parse(parts[2]);
+                scheduleDateTime = DateTime(year, month, day);
+              }
+            }
+            
+            if (scheduleDateTime != null) {
+              final todayStart = DateTime(now.year, now.month, now.day);
+              final isSameDay = scheduleDateTime.year == todayStart.year &&
+                  scheduleDateTime.month == todayStart.month &&
+                  scheduleDateTime.day == todayStart.day;
+              
+              print('  Parsed: schedule=$scheduleDateTime, today=$todayStart');
+              print('  Same day: $isSameDay');
+              
+              if (isSameDay) {
+                print('  ✅ Date parsing match!');
+                return true;
+              }
+            }
+          } catch (e) {
+            print('  ❌ Error parsing date: $e');
+          }
+          
+          print('  ❌ No match found');
+          return false;
         }).toList();
+        
+        print('Found ${todaySchedules.length} schedules for TODAY');
+        print('=== END DEBUG ===');
+        return todaySchedules;
 
       case 'This Week':
         final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-        final endOfWeek = startOfWeek.add(const Duration(days: 7));
-        return collections.where((collection) {
-          return collection.scheduledDate.isAfter(startOfWeek) &&
-              collection.scheduledDate.isBefore(endOfWeek);
+        final endOfWeek = startOfWeek.add(const Duration(days: 6));
+        
+        return schedules.where((schedule) {
+          final scheduleDateString = schedule['date'] ?? '';
+          if (scheduleDateString.isEmpty) return false;
+          
+          try {
+            final scheduleDate = DateTime.parse(scheduleDateString);
+            return scheduleDate.isAfter(startOfWeek.subtract(const Duration(days: 1))) &&
+                scheduleDate.isBefore(endOfWeek.add(const Duration(days: 1)));
+          } catch (e) {
+            return false;
+          }
         }).toList();
 
       case 'All':
       default:
-        return collections;
+        return schedules;
     }
   }
 
-  Future<void> _markAsDone(WasteCollection collection) async {
+  Future<void> _markAsDone(Map<String, dynamic> schedule) async {
     try {
       // Show confirmation dialog
       final confirmed = await showDialog<bool>(
@@ -128,7 +226,7 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
         builder: (context) => AlertDialog(
           title: const Text('Mark as Done'),
           content: Text(
-            'Are you sure you want to mark this ${collection.wasteTypeText} collection as completed?',
+            'Are you sure you want to mark this truck schedule as completed?',
           ),
           actions: [
             TextButton(
@@ -148,26 +246,34 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
       );
 
       if (confirmed == true) {
-        // Update status to completed using DriverCollectionService
-        final result = await DriverCollectionService.updateCollectionStatus(
-          collectionId: collection.id,
-          status: CollectionStatus.completed,
-        );
+        print('Marking schedule as done: ${schedule['id']}');
+        
+        try {
+          // Update status to completed in Firestore
+          await FirebaseFirestore.instance
+              .collection('truck_schedule')
+              .doc(schedule['id'])
+              .update({
+            'status': 'completed',
+            'completedAt': Timestamp.now(),
+          });
+          
+          print('Successfully updated schedule status to completed');
 
-        if (result['success']) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Collection marked as completed!'),
+              content: Text('Schedule marked as completed!'),
               backgroundColor: Colors.green,
             ),
           );
 
-          // Refresh the list to remove the completed collection
-          _loadAssignedCollections();
-        } else {
+          // Refresh the list to remove the completed schedule
+          _loadAssignedSchedules();
+        } catch (updateError) {
+          print('Error updating schedule: $updateError');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message']),
+              content: Text('Failed to update schedule: $updateError'),
               backgroundColor: Colors.red,
             ),
           );
@@ -176,33 +282,31 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to mark collection as done: $e'),
+          content: Text('Failed to mark schedule as done: $e'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  Color _getStatusColor(CollectionStatus status) {
-    switch (status) {
-      case CollectionStatus.pending:
-        return Colors.grey;
-      case CollectionStatus.approved:
-        return Colors.blue;
-      case CollectionStatus.scheduled:
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'scheduled':
         return Colors.purple;
-      case CollectionStatus.inProgress:
+      case 'in_progress':
         return Colors.orange;
-      case CollectionStatus.completed:
+      case 'completed':
         return Colors.green;
-      case CollectionStatus.cancelled:
+      case 'cancelled':
         return Colors.red;
+      default:
+        return Colors.grey;
     }
   }
 
-  Widget _buildCollectionRequestCard(
-    WasteCollection collection,
-    int requestNumber,
+  Widget _buildScheduleCard(
+    Map<String, dynamic> schedule,
+    int scheduleNumber,
   ) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSizes.paddingMedium),
@@ -239,7 +343,7 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                       ),
                       child: Center(
                         child: Text(
-                          '$requestNumber',
+                          '$scheduleNumber',
                           style: AppTextStyles.body1.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -258,14 +362,14 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: _getStatusColor(
-                                collection.status,
+                                schedule['status'] ?? 'scheduled',
                               ).withOpacity(0.2),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              collection.statusText,
+                              (schedule['status'] ?? 'scheduled').toUpperCase(),
                               style: AppTextStyles.caption.copyWith(
-                                color: _getStatusColor(collection.status),
+                                color: _getStatusColor(schedule['status'] ?? 'scheduled'),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -284,13 +388,13 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  Icons.navigation,
+                                  Icons.local_shipping,
                                   size: 12,
                                   color: Colors.blue,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'Distance unknown',
+                                  schedule['truck'] ?? 'No truck',
                                   style: AppTextStyles.caption.copyWith(
                                     color: Colors.blue,
                                     fontWeight: FontWeight.bold,
@@ -307,9 +411,9 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
 
                 const SizedBox(height: AppSizes.paddingSmall),
 
-                // Address
+                // Schedule info
                 Text(
-                  collection.address,
+                  'Time: ${schedule['startTime'] ?? 'N/A'} - ${schedule['endTime'] ?? 'N/A'}',
                   style: AppTextStyles.body1.copyWith(
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -318,7 +422,7 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
 
                 const SizedBox(height: AppSizes.paddingSmall),
 
-                // Waste type and date tags
+                // Date and collector tags
                 Row(
                   children: [
                     Container(
@@ -333,10 +437,10 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.category, size: 12, color: Colors.orange),
+                          Icon(Icons.people, size: 12, color: Colors.orange),
                           const SizedBox(width: 4),
                           Text(
-                            collection.wasteTypeText,
+                            '${(schedule['collectors'] as List?)?.length ?? 0} Collectors',
                             style: AppTextStyles.caption.copyWith(
                               color: Colors.orange,
                               fontWeight: FontWeight.bold,
@@ -358,10 +462,10 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.schedule, size: 12, color: Colors.purple),
+                          Icon(Icons.calendar_today, size: 12, color: Colors.purple),
                           const SizedBox(width: 4),
                           Text(
-                            '${collection.scheduledDate.day}/${collection.scheduledDate.month}/${collection.scheduledDate.year}',
+                            _formatDate(schedule['date'] ?? ''),
                             style: AppTextStyles.caption.copyWith(
                               color: Colors.purple,
                               fontWeight: FontWeight.bold,
@@ -373,7 +477,7 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                   ],
                 ),
 
-                if (collection.description.isNotEmpty) ...[
+                if ((schedule['streets'] as List?)?.isNotEmpty == true) ...[
                   const SizedBox(height: AppSizes.paddingSmall),
                   Container(
                     width: double.infinity,
@@ -383,7 +487,7 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      collection.description,
+                      'Streets: ${(schedule['streets'] as List?)?.take(3).join(', ') ?? 'No streets assigned'}${(schedule['streets'] as List?)?.length != null && (schedule['streets'] as List).length > 3 ? ' +${(schedule['streets'] as List).length - 3} more' : ''}',
                       style: AppTextStyles.body2.copyWith(
                         color: AppColors.textSecondary,
                       ),
@@ -398,24 +502,26 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
           const SizedBox(width: AppSizes.paddingSmall),
           Column(
             children: [
-              SizedBox(
-                width: 80,
-                height: 40,
-                child: ElevatedButton(
-                  onPressed: () => _markAsDone(collection),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 2,
+              Container(
+                width: 50,
+                height: 32,
+                child: MaterialButton(
+                  onPressed: () {
+                    print('Done button pressed for schedule: ${schedule['id']}');
+                    _markAsDone(schedule);
+                  },
+                  color: Colors.green,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  child: Text(
+                  elevation: 1,
+                  padding: EdgeInsets.zero,
+                  child: const Text(
                     'Done',
-                    style: AppTextStyles.body2.copyWith(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
                     ),
                   ),
                 ),
@@ -486,7 +592,7 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                     ),
                   ),
                   IconButton(
-                    onPressed: _loadAssignedCollections,
+                    onPressed: _loadAssignedSchedules,
                     icon: const Icon(Icons.refresh, color: Colors.white),
                     tooltip: 'Refresh',
                   ),
@@ -513,7 +619,7 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                       setState(() {
                         _selectedFilter = option;
                       });
-                      _loadAssignedCollections();
+                      _loadAssignedSchedules();
                     },
                     child: Container(
                       margin: const EdgeInsets.only(
@@ -561,7 +667,7 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                         ),
                       ),
                     )
-                  : _assignedCollections.isEmpty
+                  : _assignedSchedules.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -573,14 +679,14 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                           ),
                           const SizedBox(height: AppSizes.paddingMedium),
                           Text(
-                            'No Collections Assigned',
+                            'No Schedules Assigned',
                             style: AppTextStyles.heading3.copyWith(
                               color: AppColors.textSecondary,
                             ),
                           ),
                           const SizedBox(height: AppSizes.paddingSmall),
                           Text(
-                            'You don\'t have any collections assigned for $_selectedFilter',
+                            'You don\'t have any truck schedules assigned for $_selectedFilter',
                             style: AppTextStyles.body2.copyWith(
                               color: AppColors.textSecondary,
                             ),
@@ -590,14 +696,14 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                       ),
                     )
                   : RefreshIndicator(
-                      onRefresh: _loadAssignedCollections,
+                      onRefresh: _loadAssignedSchedules,
                       child: ListView.builder(
                         padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                        itemCount: _assignedCollections.length,
+                        itemCount: _assignedSchedules.length,
                         itemBuilder: (context, index) {
-                          final collection = _assignedCollections[index];
-                          return _buildCollectionRequestCard(
-                            collection,
+                          final schedule = _assignedSchedules[index];
+                          return _buildScheduleCard(
+                            schedule,
                             index + 1,
                           );
                         },
@@ -608,5 +714,16 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
         ),
       ),
     );
+  }
+
+  String _formatDate(String dateString) {
+    if (dateString.isEmpty) return 'No date';
+    
+    try {
+      final date = DateTime.parse(dateString);
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (e) {
+      return dateString;
+    }
   }
 }

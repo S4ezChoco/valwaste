@@ -25,8 +25,12 @@ let selectedDate = null;
 let scheduleMap;
 let selectedLocation = null;
 let selectedDriverId = null;
+let selectedDriverData = null;
 let selectedCollectors = [];
 let schedules = [];
+let allDrivers = [];
+let allCollectors = [];
+let currentBarangayFilter = null;
 
 // Month names
 const monthNames = [
@@ -36,6 +40,41 @@ const monthNames = [
 
 // MapTiler API key
 const MAPTILER_KEY = 'Kr1k642bLPyqdCL0A5yM';
+
+// Helper function to format date for input
+function formatDateForInput(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// Notification helper functions
+function showInfo(message) {
+    if (window.notifications && window.notifications.info) {
+        window.notifications.info(message);
+    } else {
+        console.log('Info:', message);
+    }
+}
+
+function showWarning(message) {
+    if (window.notifications && window.notifications.warning) {
+        window.notifications.warning(message);
+    } else {
+        console.warn('Warning:', message);
+        alert('Warning: ' + message);
+    }
+}
+
+function showError(message) {
+    if (window.notifications && window.notifications.error) {
+        window.notifications.error(message);
+    } else {
+        console.error('Error:', message);
+        alert('Error: ' + message);
+    }
+}
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
@@ -122,56 +161,131 @@ function loadTrucks() {
 // Load drivers from Firebase
 function loadDrivers() {
     db.collection('users').where('role', '==', 'Driver').onSnapshot((snapshot) => {
-        const driverMenu = document.getElementById('driver-dropdown-menu');
-        driverMenu.innerHTML = '';
-        
+        allDrivers = [];
         snapshot.forEach((doc) => {
             const userData = doc.data();
-            const driverItem = document.createElement('div');
-            driverItem.className = 'dropdown-item';
-            driverItem.innerHTML = `
-                <span>${userData.firstName} ${userData.lastName}</span>
-            `;
-            driverItem.onclick = () => selectDriver(doc.id, userData.firstName + ' ' + userData.lastName);
-            driverMenu.appendChild(driverItem);
+            allDrivers.push({
+                id: doc.id,
+                ...userData,
+                displayName: `${userData.firstName} ${userData.lastName}`
+            });
         });
+        
+        // Initial render shows all drivers
+        renderDrivers();
+    });
+}
+
+// Render drivers based on current filter
+function renderDrivers() {
+    const driverMenu = document.getElementById('driver-dropdown-menu');
+    driverMenu.innerHTML = '';
+    
+    // Filter drivers based on current barangay filter
+    let driversToShow = allDrivers;
+    if (currentBarangayFilter) {
+        driversToShow = allDrivers.filter(driver => 
+            driver.barangay === currentBarangayFilter
+        );
+    }
+    
+    if (driversToShow.length === 0) {
+        const emptyItem = document.createElement('div');
+        emptyItem.className = 'dropdown-item';
+        emptyItem.style.color = '#6b7280';
+        emptyItem.style.fontStyle = 'italic';
+        emptyItem.innerHTML = currentBarangayFilter ? 
+            `No drivers in ${currentBarangayFilter}` : 
+            'No drivers available';
+        driverMenu.appendChild(emptyItem);
+        return;
+    }
+    
+    driversToShow.forEach((driver) => {
+        const driverItem = document.createElement('div');
+        driverItem.className = 'dropdown-item';
+        driverItem.innerHTML = `
+            <span>${driver.displayName}${driver.barangay ? ` (${driver.barangay})` : ''}</span>
+        `;
+        driverItem.onclick = () => selectDriver(driver.id, driver.displayName, driver);
+        driverMenu.appendChild(driverItem);
     });
 }
 
 // Load waste collectors from Firebase
 function loadWasteCollectors() {
     db.collection('users').where('role', 'in', ['Driver', 'Waste Collector']).onSnapshot((snapshot) => {
-        const collectorsMenu = document.getElementById('collectors-dropdown-menu');
-        collectorsMenu.innerHTML = '';
-        
+        allCollectors = [];
         snapshot.forEach((doc) => {
             const userData = doc.data();
-            const collectorItem = document.createElement('div');
-            collectorItem.className = 'dropdown-item';
-            
-            // Create checkbox element programmatically to avoid quote issues
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = `collector-${doc.id}`;
-            checkbox.addEventListener('change', function() {
-                toggleCollector(doc.id, `${userData.firstName} ${userData.lastName}`);
+            allCollectors.push({
+                id: doc.id,
+                ...userData,
+                displayName: `${userData.firstName} ${userData.lastName}`
             });
-            
-            const span = document.createElement('span');
-            span.textContent = `${userData.firstName} ${userData.lastName} (Palero)`;
-            span.style.marginLeft = '8px';
-            span.style.cursor = 'pointer';
-            
-            // Make the span clickable to toggle checkbox
-            span.addEventListener('click', function() {
-                checkbox.checked = !checkbox.checked;
-                checkbox.dispatchEvent(new Event('change'));
-            });
-            
-            collectorItem.appendChild(checkbox);
-            collectorItem.appendChild(span);
-            collectorsMenu.appendChild(collectorItem);
         });
+        
+        // Initial render shows all collectors
+        renderCollectors();
+    });
+}
+
+// Render collectors based on current filter
+function renderCollectors() {
+    const collectorsMenu = document.getElementById('collectors-dropdown-menu');
+    collectorsMenu.innerHTML = '';
+    
+    // Filter collectors based on current barangay filter
+    let collectorsToShow = allCollectors;
+    if (currentBarangayFilter) {
+        collectorsToShow = allCollectors.filter(collector => 
+            collector.barangay === currentBarangayFilter
+        );
+    }
+    
+    if (collectorsToShow.length === 0) {
+        const emptyItem = document.createElement('div');
+        emptyItem.className = 'dropdown-item';
+        emptyItem.style.color = '#6b7280';
+        emptyItem.style.fontStyle = 'italic';
+        emptyItem.innerHTML = currentBarangayFilter ? 
+            `No paleros in ${currentBarangayFilter}` : 
+            'No paleros available';
+        collectorsMenu.appendChild(emptyItem);
+        return;
+    }
+    
+    collectorsToShow.forEach((collector) => {
+        const collectorItem = document.createElement('div');
+        collectorItem.className = 'dropdown-item';
+        
+        // Create checkbox element programmatically
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `collector-${collector.id}`;
+        
+        // Check if this collector was previously selected
+        const isSelected = selectedCollectors.some(c => c.id === collector.id);
+        checkbox.checked = isSelected;
+        
+        checkbox.addEventListener('change', function() {
+            toggleCollector(collector.id, collector.displayName, collector);
+        });
+        
+        const span = document.createElement('span');
+        span.textContent = `${collector.displayName} (${collector.role === 'Waste Collector' ? 'Palero' : 'Driver'})${collector.barangay ? ` - ${collector.barangay}` : ''}`;
+        span.style.marginLeft = '8px';
+        span.style.cursor = 'pointer';
+        
+        // Make the span clickable to toggle checkbox
+        span.addEventListener('click', function() {
+            checkbox.checked = !checkbox.checked;
+            checkbox.dispatchEvent(new Event('change'));
+        });
+        
+        collectorItem.appendChild(checkbox);
+        collectorItem.appendChild(span);
+        collectorsMenu.appendChild(collectorItem);
     });
 }
 
@@ -384,6 +498,54 @@ function closeCreateModal() {
     closeAllDropdowns();
 }
 
+// Reset form and filters
+function resetForm() {
+    // Reset selections
+    selectedDriverId = null;
+    selectedDriverData = null;
+    selectedCollectors = [];
+    selectedLocation = null;
+    currentBarangayFilter = null;
+    
+    // Reset display texts
+    document.getElementById('driver-selected-text').textContent = 'Select driver';
+    document.getElementById('collectors-selected-text').textContent = 'Select waste collectors';
+    document.getElementById('selected-driver').value = '';
+    
+    // Clear street markers
+    if (window.streetMarkers) {
+        streetMarkers.forEach(m => m.marker.remove());
+        streetMarkers = [];
+    }
+    
+    // Clear any barangay markers
+    if (window.barangayMarker) {
+        window.barangayMarker.remove();
+        window.barangayMarker = null;
+    }
+    
+    // Reset coordinates display
+    const coordsDisplay = document.getElementById('coordinates-display');
+    if (coordsDisplay) {
+        coordsDisplay.innerHTML = 'Click on the map to select a location';
+    }
+    
+    // Clear street checklist
+    const checklist = document.getElementById('streets-checklist');
+    if (checklist) {
+        checklist.innerHTML = '';
+    }
+    
+    // Re-render drivers and collectors without filter
+    renderDrivers();
+    renderCollectors();
+    
+    // Uncheck all collector checkboxes
+    document.querySelectorAll('[id^="collector-"]').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+}
+
 // Close modal when clicking outside
 document.addEventListener('click', function(event) {
     const modal = document.getElementById('create-schedule-modal');
@@ -443,14 +605,39 @@ function closeAllDropdowns() {
     });
 }
 
-function selectDriver(driverId, driverName) {
+function selectDriver(driverId, driverName, driverData) {
     selectedDriverId = driverId;
+    selectedDriverData = driverData;
     document.getElementById('driver-selected-text').textContent = driverName;
     document.getElementById('selected-driver').value = driverId;
     closeAllDropdowns();
+    
+    // If driver has a barangay, apply filter and pin location
+    if (driverData && driverData.barangay) {
+        console.log('Driver selected with barangay:', driverData.barangay);
+        
+        // Set the barangay filter
+        currentBarangayFilter = driverData.barangay;
+        
+        // Re-render drivers and collectors with the new filter
+        renderDrivers();
+        renderCollectors();
+        
+        // Clear previously selected collectors if they're not from the same barangay
+        selectedCollectors = selectedCollectors.filter(c => c.barangay === driverData.barangay);
+        updateCollectorsDisplay();
+        
+        // Pin the barangay on the map (but don't replace street checklist)
+        pinDriverBarangayOnMap(driverData.barangay);
+        
+        // Show notification
+        if (window.showInfo) {
+            window.showInfo(`Filtered to ${driverData.barangay} barangay`);
+        }
+    }
 }
 
-function toggleCollector(collectorId, collectorName) {
+function toggleCollector(collectorId, collectorName, collectorData) {
     const checkbox = document.getElementById(`collector-${collectorId}`);
     
     if (checkbox.checked) {
@@ -459,7 +646,11 @@ function toggleCollector(collectorId, collectorName) {
             showWarning('You can only select up to 3 waste collectors.');
             return;
         }
-        selectedCollectors.push({ id: collectorId, name: collectorName });
+        selectedCollectors.push({ 
+            id: collectorId, 
+            name: collectorName,
+            barangay: collectorData ? collectorData.barangay : null 
+        });
     } else {
         selectedCollectors = selectedCollectors.filter(c => c.id !== collectorId);
     }
@@ -796,6 +987,117 @@ function loadNearbyStreets(lat, lng) {
 
 // Global variable to store map markers
 let streetMarkers = [];
+let barangayMarker = null;
+
+// Function to pin barangay on map (preserves existing street checklist)
+function pinDriverBarangayOnMap(barangayName) {
+    if (!scheduleMap) return;
+    
+    // Get barangay coordinates
+    const barangayData = getBarangayCoordinates(barangayName);
+    if (!barangayData) {
+        console.log('No coordinates found for barangay:', barangayName);
+        return;
+    }
+    
+    // Remove existing barangay marker if any
+    if (window.barangayMarker) {
+        window.barangayMarker.remove();
+        window.barangayMarker = null;
+    }
+    
+    // Add new marker for barangay
+    window.barangayMarker = new maplibregl.Marker({
+        color: '#3b82f6' // Blue color for barangay center
+    })
+        .setLngLat(barangayData.coordinates)
+        .addTo(scheduleMap);
+    
+    // Center map on barangay only if no streets are currently selected
+    if (streetMarkers.length === 0) {
+        scheduleMap.flyTo({
+            center: barangayData.coordinates,
+            zoom: 13,
+            duration: 1000
+        });
+    }
+    
+    // Don't touch the street checklist - preserve user's selections
+}
+
+// Function to pin barangay on map (for initial street loading)
+function pinBarangayOnMap(barangayName) {
+    if (!scheduleMap) return;
+    
+    // Get barangay coordinates
+    const barangayData = getBarangayCoordinates(barangayName);
+    if (!barangayData) {
+        console.log('No coordinates found for barangay:', barangayName);
+        return;
+    }
+    
+    // Remove existing barangay marker if any
+    if (window.barangayMarker) {
+        window.barangayMarker.remove();
+        window.barangayMarker = null;
+    }
+    
+    // Add new marker for barangay
+    window.barangayMarker = new maplibregl.Marker({
+        color: '#3b82f6' // Blue color for barangay center
+    })
+        .setLngLat(barangayData.coordinates)
+        .addTo(scheduleMap);
+    
+    // Center map on barangay
+    scheduleMap.flyTo({
+        center: barangayData.coordinates,
+        zoom: 13,
+        duration: 1000
+    });
+    
+    // Load streets for this barangay in the checklist (only for initial loading)
+    const streetsData = getAllValenzuelaStreets();
+    if (streetsData[barangayName]) {
+        const barangayStreets = streetsData[barangayName].streets.map(street => ({
+            display: `${barangayName} Area`,
+            street: street,
+            barangay: barangayName,
+            coordinates: barangayData.coordinates
+        }));
+        displayStreetsChecklist(barangayStreets);
+    }
+}
+
+// Get barangay coordinates
+function getBarangayCoordinates(barangayName) {
+    const streetsData = getAllValenzuelaStreets();
+    if (streetsData[barangayName]) {
+        return {
+            name: barangayName,
+            coordinates: streetsData[barangayName].coordinates
+        };
+    }
+    return null;
+}
+
+// Extract barangay name from street display
+function extractBarangayFromStreet(streetDisplay) {
+    // Street display format is usually "BarangayName Area"
+    if (streetDisplay && streetDisplay.includes(' Area')) {
+        return streetDisplay.replace(' Area', '');
+    }
+    
+    // Fallback: check if the street display matches any barangay name
+    const streetsData = getAllValenzuelaStreets();
+    for (const barangayName in streetsData) {
+        if (streetDisplay.includes(barangayName)) {
+            return barangayName;
+        }
+    }
+    
+    return null;
+}
 
 function displayStreetsChecklist(streets) {
     const checklist = document.getElementById('streets-checklist');
@@ -859,6 +1161,32 @@ function handleStreetSelection(streetObj, isChecked) {
         // Update coordinates display
         updateCoordinatesDisplay();
         
+        // Apply barangay filter based on selected street
+        const streetBarangay = streetObj.barangay || extractBarangayFromStreet(streetObj.display);
+        
+        if (streetBarangay) {
+            currentBarangayFilter = streetBarangay;
+            
+            // Clear selected driver if it's from a different barangay
+            if (selectedDriverData && selectedDriverData.barangay && selectedDriverData.barangay !== streetBarangay) {
+                selectedDriverId = null;
+                selectedDriverData = null;
+                document.getElementById('driver-selected-text').textContent = 'Select driver';
+                document.getElementById('selected-driver').value = '';
+            }
+            
+            // Clear selected collectors from different barangays
+            selectedCollectors = selectedCollectors.filter(c => c.barangay === streetBarangay);
+            updateCollectorsDisplay();
+            
+            // Re-render drivers and collectors with the new filter
+            renderDrivers();
+            renderCollectors();
+            
+            // Show notification
+            showInfo(`Filtered to ${streetBarangay} barangay`);
+        }
+        
         // Center map on the selected area if it's the first selection
         if (streetMarkers.length === 1) {
             scheduleMap.flyTo({
@@ -880,6 +1208,16 @@ function handleStreetSelection(streetObj, isChecked) {
         
         // Update coordinates display
         updateCoordinatesDisplay();
+        
+        // If no more streets are selected, clear the barangay filter
+        if (streetMarkers.length === 0) {
+            currentBarangayFilter = null;
+            renderDrivers();
+            renderCollectors();
+            
+            // Show notification
+            showInfo('Filter cleared - showing all personnel');
+        }
     }
 }
 
