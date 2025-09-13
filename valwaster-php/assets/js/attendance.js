@@ -1,26 +1,41 @@
 // Attendance Management JavaScript
 
-// Firebase configuration
-const firebaseConfig = {
-    apiKey: "AIzaSyAr5KSpYvShZrCEJLMGf7ckrbfedta3W_M",
-    authDomain: "valwaste-89930.firebaseapp.com",
-    projectId: "valwaste-89930",
-    storageBucket: "valwaste-89930.firebasestorage.app",
-    messagingSenderId: "301491189774",
-    appId: "1:301491189774:web:23f0fa68d2b264946b245f",
-    measurementId: "G-C70DHXP9FW"
-};
-
-// Initialize Firebase if not already initialized
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
-const db = firebase.firestore();
-const storage = firebase.storage();
-
-// Data storage
-let attendanceData = [];
-let teamMembers = [];
+// Sample data
+let attendanceData = [
+    {
+        id: "r1",
+        driver: "John Doe",
+        role: "Driver",
+        teamCount: 3,
+        checkIn: "May 15, 08:00 AM",
+        checkOut: null,
+        status: "pending",
+        members: [
+            { name: "Maria Garcia", role: "Collector" },
+            { name: "Ahmed Ali", role: "Collector" },
+            { name: "Carlos Rodriguez", role: "Palero" }
+        ],
+        location: "Central Waste Facility",
+        notes: "Morning shift, Route A - North sector",
+        expanded: false
+    },
+    {
+        id: "r2",
+        driver: "Sarah Johnson",
+        role: "Driver", 
+        teamCount: 2,
+        checkIn: "May 15, 08:15 AM",
+        checkOut: "May 15, 04:30 PM",
+        status: "verified",
+        members: [
+            { name: "Dina", role: "Collector" },
+            { name: "Evan", role: "Palero" }
+        ],
+        location: "West Transfer Station",
+        notes: "Afternoon shift, Route B",
+        expanded: false
+    }
+];
 
 let currentTab = "team-records";
 let selectedTeamMembers = [];
@@ -29,58 +44,9 @@ let currentRecord = null;
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
-    loadAttendanceRecords();
-    loadTeamMembers();
+    renderAttendanceTable();
     updateCheckOutOptions();
 });
-
-// Load attendance records from Firebase
-function loadAttendanceRecords() {
-    console.log('Loading attendance records from Firebase...');
-    
-    db.collection('attendance').orderBy('checkInTime', 'desc').onSnapshot((snapshot) => {
-        attendanceData = [];
-        snapshot.forEach((doc) => {
-            const data = doc.data();
-            attendanceData.push({
-                id: doc.id,
-                ...data,
-                expanded: false
-            });
-        });
-        
-        console.log('Loaded attendance records:', attendanceData.length);
-        renderAttendanceTable();
-        updateCheckOutOptions();
-    }, (error) => {
-        console.error('Error loading attendance records:', error);
-        showError('Failed to load attendance records');
-    });
-}
-
-// Load team members from Firebase
-function loadTeamMembers() {
-    console.log('Loading team members from Firebase...');
-    
-    db.collection('users')
-        .where('role', 'in', ['Driver', 'Waste Collector', 'Palero'])
-        .onSnapshot((snapshot) => {
-            teamMembers = [];
-            snapshot.forEach((doc) => {
-                const data = doc.data();
-                teamMembers.push({
-                    id: doc.id,
-                    name: data.name || data.firstName + ' ' + data.lastName,
-                    role: data.role,
-                    email: data.email
-                });
-            });
-            
-            console.log('Loaded team members:', teamMembers.length);
-        }, (error) => {
-            console.error('Error loading team members:', error);
-        });
-}
 
 // Tab switching
 function switchTab(tab) {
@@ -380,17 +346,21 @@ function capturePhoto(type) {
     }, 100);
 }
 
-// Check-in function
-async function handleCheckIn(event) {
+// Form submissions
+function submitCheckIn(event) {
     event.preventDefault();
     
-    const driver = document.getElementById('check-in-driver').value;
-    const location = document.getElementById('check-in-location').value;
-    const notes = document.getElementById('check-in-notes').value;
-    const photoInput = document.getElementById('check-in-photo');
+    const driver = document.getElementById('driver-select').value;
+    const location = document.getElementById('location-input').value;
+    const notes = document.getElementById('notes-input').value;
     
-    if (!driver || !location || selectedTeamMembers.length === 0) {
-        showError('Please fill in all required fields');
+    if (!driver) {
+        alert('Please select a driver.');
+        return;
+    }
+    
+    if (selectedTeamMembers.length === 0) {
+        alert('Please add at least one team member.');
         return;
     }
     
@@ -486,44 +456,36 @@ function updateCheckOutOptions() {
 }
 
 // Record actions
-async function verifyRecord(recordId) {
-    try {
-        await db.collection('attendance').doc(recordId).update({
+function verifyRecord() {
+    if (!currentRecord) return;
+    
+    attendanceData = attendanceData.map(r => 
+        r.id === currentRecord.id ? { 
+            ...r, 
             status: 'verified',
-            verifiedAt: firebase.firestore.Timestamp.now(),
-            verifiedBy: 'Administrator' // In production, get actual admin user
-        });
-        
-        showSuccess('Record verified successfully!');
-    } catch (error) {
-        console.error('Error verifying record:', error);
-        showError('Failed to verify record');
-    }
+            checkOut: r.checkOut || formatDateTime(new Date())
+        } : r
+    );
+    
+    renderAttendanceTable();
+    updatePendingCount();
+    closeDetailsModal();
+    
+    alert('Record verified successfully!');
 }
 
-async function rejectRecord(recordId) {
-    if (confirm('Are you sure you want to reject this record?')) {
-        try {
-            await db.collection('attendance').doc(recordId).update({
-                status: 'rejected',
-                rejectedAt: firebase.firestore.Timestamp.now(),
-                rejectedBy: 'Administrator' // In production, get actual admin user
-            });
-            
-            closeDetailsModal();
-            showSuccess('Record rejected');
-        } catch (error) {
-            console.error('Error rejecting record:', error);
-            showError('Failed to reject record');
-        }
-    }
-}
-
-// Legacy reject function - redirects to async version
 function rejectRecord() {
-    if (currentRecord && currentRecord.id) {
-        rejectRecord(currentRecord.id);
-    }
+    if (!currentRecord) return;
+    
+    attendanceData = attendanceData.map(r => 
+        r.id === currentRecord.id ? { ...r, status: 'not-out' } : r
+    );
+    
+    renderAttendanceTable();
+    updatePendingCount();
+    closeDetailsModal();
+    
+    alert('Record rejected.');
 }
 
 // Reset forms

@@ -9,9 +9,7 @@ import '../../models/waste_collection.dart';
 import '../collection/collection_request_screen.dart';
 
 class MapScreen extends StatefulWidget {
-  final Map<String, dynamic>? schedule;
-  
-  const MapScreen({super.key, this.schedule});
+  const MapScreen({super.key});
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -67,29 +65,20 @@ class _MapScreenState extends State<MapScreen> {
     super.initState();
     _mapController = MapController();
     _initializeMap();
-    if (widget.schedule != null) {
-      _loadScheduleRoute();
-    }
   }
 
   Future<void> _initializeMap() async {
     try {
-      await _requestLocationPermission();
-      await _getCurrentLocation();
-      _loadWasteCollectionPoints();
+    await _requestLocationPermission();
+    await _getCurrentLocation();
+    _loadWasteCollectionPoints();
     } catch (e) {
       print('Error initializing map: $e');
-      // Set default location if initialization fails
-      if (mounted) {
-        setState(() {
-          _currentLocation = const LatLng(14.7000, 120.9833); // Valenzuela City default
-        });
-      }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+    setState(() {
+      _isLoading = false;
+    });
       }
     }
   }
@@ -168,23 +157,6 @@ class _MapScreenState extends State<MapScreen> {
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          // Return default position if timeout
-          return Position(
-            latitude: 14.7000,
-            longitude: 120.9833,
-            timestamp: DateTime.now(),
-            accuracy: 0,
-            altitude: 0,
-            heading: 0,
-            speed: 0,
-            speedAccuracy: 0,
-            altitudeAccuracy: 0,
-            headingAccuracy: 0,
-          );
-        },
       );
 
       if (mounted) {
@@ -208,98 +180,6 @@ class _MapScreenState extends State<MapScreen> {
             backgroundColor: Colors.red,
           ),
         );
-      }
-    }
-  }
-
-  void _loadScheduleRoute() {
-    if (widget.schedule == null) return;
-    
-    final streets = widget.schedule!['streets'] as List<dynamic>? ?? [];
-    final latitude = widget.schedule!['latitude'];
-    final longitude = widget.schedule!['longitude'];
-    
-    // If we have coordinates from the schedule, center the map there
-    if (latitude != null && longitude != null) {
-      final centerPoint = LatLng(latitude.toDouble(), longitude.toDouble());
-      _mapController.move(centerPoint, 14.0);
-      
-      // Add a marker for the schedule location
-      setState(() {
-        _wasteCollectionPoints.add(
-          Marker(
-            point: centerPoint,
-            width: 60,
-            height: 60,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.9),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.flag, color: Colors.white, size: 24),
-            ),
-          ),
-        );
-      });
-    }
-    
-    // Add markers for each street in the route
-    for (int i = 0; i < streets.length && i < 5; i++) {
-      // Limit to first 5 streets for performance
-      final street = streets[i];
-      // Try to find coordinates for the street (simplified - in real app would use geocoding)
-      LatLng? streetCoord;
-      
-      // Check if street name contains a known barangay
-      for (final entry in _barangayCoordinates.entries) {
-        if (street.toString().toLowerCase().contains(entry.key.toLowerCase().replaceAll('barangay ', ''))) {
-          streetCoord = entry.value;
-          break;
-        }
-      }
-      
-      if (streetCoord != null) {
-        setState(() {
-          _wasteCollectionPoints.add(
-            Marker(
-              point: streetCoord!,
-              width: 50,
-              height: 50,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.9),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.orange.withOpacity(0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    '${i + 1}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        });
       }
     }
   }

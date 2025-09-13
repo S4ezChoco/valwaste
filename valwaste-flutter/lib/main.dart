@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'services/firebase_auth_service.dart';
-import 'services/sync_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'utils/constants.dart';
@@ -15,11 +14,6 @@ void main() async {
 
   // Initialize Firebase Auth Service
   await FirebaseAuthService.initialize();
-
-  // Perform initial sync with admin panel
-  SyncService.performFullSync().then((result) {
-    print('Initial sync: ${result['message']}');
-  });
 
   runApp(const MyApp());
 }

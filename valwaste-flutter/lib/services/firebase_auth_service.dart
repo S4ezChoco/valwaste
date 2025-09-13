@@ -402,37 +402,12 @@ class FirebaseAuthService {
           // Handle the specific error we're seeing
           if (authError.toString().contains('PigeonUserDetails')) {
             print(
-              'Detected PigeonUserDetails error, attempting to recover...',
+              'Detected PigeonUserDetails error, user data may be corrupted...',
             );
-            // Try to create user data if missing
-            try {
-              await _auth.signOut();
-              await Future.delayed(const Duration(seconds: 1));
-              
-              // Retry login
-              final retryCredential = await _auth.signInWithEmailAndPassword(
-                email: email,
-                password: password,
-              );
-              
-              if (retryCredential.user != null) {
-                await _fetchUserFromFirestore(retryCredential.user!.uid);
-                
-                if (_currentUser != null) {
-                  return {
-                    'success': true,
-                    'message': 'Login successful! Welcome back!',
-                    'user': _currentUser,
-                  };
-                }
-              }
-            } catch (retryError) {
-              print('Retry failed: $retryError');
-            }
-            
             return {
               'success': false,
-              'message': 'Login failed. Please try again or contact support.',
+              'message':
+                  'Login successful but user data is corrupted. Please contact admin.',
             };
           }
 

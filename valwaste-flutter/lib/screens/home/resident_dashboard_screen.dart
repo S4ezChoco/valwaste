@@ -1,77 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/constants.dart';
 import '../../services/firebase_auth_service.dart';
-import '../../services/announcement_service.dart';
-import '../../widgets/announcement_banner.dart';
 import '../collection/collection_request_screen.dart';
 import '../guide/recycling_guide_screen.dart';
-import '../reports/resident_reports_screen.dart';
-import '../reports/create_report_screen.dart';
-import '../announcements/announcements_screen.dart';
-import '../schedule/schedule_screen.dart';
 
-class ResidentDashboardScreen extends StatefulWidget {
+class ResidentDashboardScreen extends StatelessWidget {
   const ResidentDashboardScreen({super.key});
-
-  @override
-  State<ResidentDashboardScreen> createState() => _ResidentDashboardScreenState();
-}
-
-class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  Map<String, dynamic>? _todaySchedule;
-  int _activeReports = 0;
-  int _totalReports = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    await _loadTodaySchedule();
-    await _loadReportStats();
-  }
-
-  Future<void> _loadTodaySchedule() async {
-    final today = DateTime.now();
-    final todayString = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-    
-    final scheduleQuery = await _firestore
-        .collection('truck_schedule')
-        .where('date', isEqualTo: todayString)
-        .limit(1)
-        .get();
-    
-    if (scheduleQuery.docs.isNotEmpty && mounted) {
-      setState(() {
-        _todaySchedule = scheduleQuery.docs.first.data();
-      });
-    }
-  }
-
-  Future<void> _loadReportStats() async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-    
-    final reportsQuery = await _firestore
-        .collection('barangay_reports')
-        .where('reporterId', isEqualTo: user.uid)
-        .get();
-    
-    if (mounted) {
-      setState(() {
-        _totalReports = reportsQuery.docs.length;
-        _activeReports = reportsQuery.docs
-            .where((doc) => doc.data()['status'] == 'pending_review' || doc.data()['status'] == 'sent_to_admin')
-            .length;
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,9 +19,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Announcement Banner at the top
-              const AnnouncementBanner(),
-                
               // Welcome Header
               Row(
                 children: [
@@ -127,144 +58,39 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
               const SizedBox(height: AppSizes.paddingLarge),
 
               // Today's Collection Status
-              if (_todaySchedule != null)
-                Container(
-                  padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                    border: Border.all(color: Colors.green.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.green, size: 24),
-                      const SizedBox(width: AppSizes.paddingSmall),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Today\'s Collection',
-                              style: AppTextStyles.body1.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                              ),
-                            ),
-                            Text(
-                              'Scheduled for ${_todaySchedule!['startTime']} - ${_todaySchedule!['endTime']}',
-                              style: AppTextStyles.body2.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.orange, size: 24),
-                      const SizedBox(width: AppSizes.paddingSmall),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'No Collection Today',
-                              style: AppTextStyles.body1.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.orange,
-                              ),
-                            ),
-                            Text(
-                              'Check schedule for upcoming collections',
-                              style: AppTextStyles.body2.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+              Container(
+                padding: const EdgeInsets.all(AppSizes.paddingMedium),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
                 ),
-
-              const SizedBox(height: AppSizes.paddingLarge),
-
-              // Announcements Section
-              StreamBuilder<QuerySnapshot>(
-                stream: AnnouncementService.getActiveAnnouncements(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-                  
-                  final latestAnnouncement = snapshot.data!.docs.first.data() as Map<String, dynamic>;
-                  
-                  return Container(
-                    padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                    margin: const EdgeInsets.only(bottom: AppSizes.paddingLarge),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.campaign, color: AppColors.primary, size: 20),
-                            const SizedBox(width: AppSizes.paddingSmall),
-                            Text(
-                              'Latest Announcement',
-                              style: AppTextStyles.body1.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSizes.paddingSmall),
-                        Text(
-                          latestAnnouncement['message'] ?? '',
-                          style: AppTextStyles.body2.copyWith(
-                            color: AppColors.textPrimary,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: AppSizes.paddingSmall),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const AnnouncementsScreen(),
-                              ),
-                            );
-                          },
-                          child: Text(
-                            'View all announcements →',
-                            style: AppTextStyles.caption.copyWith(
-                              color: AppColors.primary,
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: 24),
+                    const SizedBox(width: AppSizes.paddingSmall),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Today\'s Collection',
+                            style: AppTextStyles.body1.copyWith(
                               fontWeight: FontWeight.bold,
+                              color: Colors.green,
                             ),
                           ),
-                        ),
-                      ],
+                          Text(
+                            'Scheduled for 9:00 AM - 11:00 AM',
+                            style: AppTextStyles.body2.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
 
               const SizedBox(height: AppSizes.paddingLarge),
@@ -294,10 +120,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     subtitle: 'Schedule waste pickup',
                     color: AppColors.primary,
                     onTap: () {
-                      Navigator.push(
-                        context,
+                      Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (context) => const ScheduleScreen(),
+                          builder: (context) => const CollectionRequestScreen(),
                         ),
                       );
                     },
@@ -334,31 +159,21 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                     },
                   ),
                   _ActionCard(
-                    icon: Icons.report_problem,
-                    title: 'Report Issue',
-                    subtitle: 'Report waste problems',
-                    color: Colors.red,
+                    icon: Icons.history_outlined,
+                    title: 'Collection History',
+                    subtitle: 'View past pickups',
+                    color: Colors.purple,
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CreateReportScreen(),
-                        ),
-                      );
+                      // Navigate to history
                     },
                   ),
                   _ActionCard(
-                    icon: Icons.notifications,
-                    title: 'Announcements',
-                    subtitle: 'Important updates',
-                    color: Colors.amber,
+                    icon: Icons.notifications_outlined,
+                    title: 'Notifications',
+                    subtitle: 'Stay updated',
+                    color: Colors.red,
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AnnouncementsScreen(),
-                        ),
-                      );
+                      // Navigate to notifications
                     },
                   ),
                 ],
@@ -399,81 +214,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                 time: '3 days ago',
                 icon: Icons.recycling,
                 color: Colors.green,
-              ),
-
-              const SizedBox(height: AppSizes.paddingLarge),
-
-              // Report Statistics
-              Text(
-                'Your Reports',
-                style: AppTextStyles.heading3.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: AppSizes.paddingMedium),
-
-              // Activity Cards
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            _totalReports.toString(),
-                            style: AppTextStyles.heading2.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Total Reports',
-                            style: AppTextStyles.caption.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSizes.paddingMedium),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            _activeReports.toString(),
-                            style: AppTextStyles.heading2.copyWith(
-                              color: Colors.orange,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Active',
-                            style: AppTextStyles.caption.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ],
           ),

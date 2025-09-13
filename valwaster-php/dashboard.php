@@ -73,17 +73,6 @@
         .role-text strong {
             color: #374151;
         }
-        
-        /* Traffic toggle button styling */
-        #toggleTraffic.active {
-            background: rgba(59, 130, 246, 0.2);
-            color: #3B82F6;
-            border-color: rgba(59, 130, 246, 0.3);
-        }
-        
-        #toggleTraffic.active svg {
-            stroke: #3B82F6;
-        }
     </style>
 </head>
 <body>
@@ -163,7 +152,7 @@
                     <div class="card stats-card">
                         <div class="stats-meta">
                             <p class="stats-label">Total Reports</p>
-                            <div class="stats-value" style="color: #333;" id="totalReportsCount">0</div>
+                            <h3 class="stats-value" id="totalReports">0</h3>
                             <p class="stats-sub">Reports made by users</p>
                         </div>
                         <div class="stats-icon">
@@ -270,12 +259,49 @@
                     <aside class="card recent">
                         <h3 class="recent-title">Recent Reports</h3>
                         <div class="recent-list" id="recentReportsList">
-                            <!-- Reports will be loaded from Firebase -->
-                            <div style="text-align: center; padding: 20px; color: #6b7280;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin: 0 auto; animation: spin 1s linear infinite;">
-                                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                                </svg>
-                                <p style="margin-top: 8px;">Loading reports...</p>
+                            <div class="report-row">
+                                <div class="report-main">
+                                    <div class="report-title">Garbage overflow at Main Street</div>
+                                    <div class="report-sub">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                            <circle cx="12" cy="10" r="3"></circle>
+                                        </svg>
+                                        <span>Block 5, Main Street</span>
+                                    </div>
+                                    <div class="report-date">5/12/2023</div>
+                                </div>
+                                <span class="pill pill-pending">Pending</span>
+                            </div>
+
+                            <div class="report-row">
+                                <div class="report-main">
+                                    <div class="report-title">Truck missed scheduled collection</div>
+                                    <div class="report-sub">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                            <circle cx="12" cy="10" r="3"></circle>
+                                        </svg>
+                                        <span>Green Valley Subdivision</span>
+                                    </div>
+                                    <div class="report-date">5/11/2023</div>
+                                </div>
+                                <span class="pill pill-pending">Pending</span>
+                            </div>
+
+                            <div class="report-row">
+                                <div class="report-main">
+                                    <div class="report-title">Illegal dumping spotted</div>
+                                    <div class="report-sub">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                            <circle cx="12" cy="10" r="3"></circle>
+                                        </svg>
+                                        <span>Riverside Park</span>
+                                    </div>
+                                    <div class="report-date">5/11/2023</div>
+                                </div>
+                                <span class="pill pill-pending">Pending</span>
                             </div>
                         </div>
                         <button class="btn-outline" type="button" onclick="window.location.href='report-management.php'">
@@ -284,58 +310,22 @@
                     </aside>
                 </section>
 
-                <!-- Announcements -->
+                <!-- Latest Announcement -->
                 <section class="card annc-card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                        <h4 class="annc-title">Announcements</h4>
-                        <div style="display: flex; gap: 8px;">
-                            <button type="button" class="btn-outline" onclick="viewArchivedAnnouncements()" style="padding: 8px 16px; font-size: 14px;">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
-                                    <polyline points="21 8 21 21 3 21 3 8"></polyline>
-                                    <rect x="1" y="3" width="22" height="5"></rect>
-                                    <line x1="10" y1="12" x2="14" y2="12"></line>
-                                </svg>
-                                Archive
-                            </button>
-                            <button type="button" class="btn-outline" onclick="editAnnouncement()">
-                                Create Announcement
-                            </button>
-                        </div>
-                    </div>
-                    
+                    <h4 class="annc-title">Latest Announcement</h4>
                     <div id="announcementSection">
-                        <div id="announcementsList">
-                            <!-- Announcements will be loaded here -->
+                        <p class="annc-body" id="announcementText">No announcement yet.</p>
+                        <div class="annc-actions">
+                            <button type="button" class="btn-outline" onclick="editAnnouncement()">
+                                Edit Announcement
+                            </button>
                         </div>
                     </div>
                     
                     <div id="editAnnouncementSection" style="display: none;">
-                        <textarea class="annc-textarea" id="announcementTextarea" placeholder="Type your announcement..." maxlength="500"></textarea>
-                        <div style="text-align: right; margin: 4px 0; color: #6b7280; font-size: 12px;">
-                            <span id="charCount">0</span>/500 characters
-                        </div>
-                        <div style="margin: 12px 0;">
-                            <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #374151; font-size: 14px;">
-                                Auto-delete after:
-                            </label>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <input type="number" id="announcementDuration" 
-                                       value="24" min="1" max="24" 
-                                       style="width: 80px; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
-                                <span style="color: #6b7280; font-size: 14px;">hours</span>
-                                <small style="color: #6b7280; font-size: 12px; margin-left: 8px;">
-                                    (Max: 24 hours)
-                                </small>
-                            </div>
-                        </div>
+                        <textarea class="annc-textarea" id="announcementTextarea" placeholder="Type your announcement..."></textarea>
                         <div class="annc-actions">
-                            <button type="button" class="btn-primary" onclick="sendAnnouncement()" id="sendAnnouncementBtn">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
-                                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                                    <polygon points="22,2 15,22 11,13 2,9"></polygon>
-                                </svg>
-                                Send
-                            </button>
+                            <button type="button" class="btn-primary" onclick="saveAnnouncement()">Save</button>
                             <button type="button" class="btn-ghost" onclick="cancelAnnouncement()">Cancel</button>
                         </div>
                     </div>
@@ -399,7 +389,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     
     <script type="module" src="assets/js/auth.js"></script>
-    <script src="assets/js/notifications.js"></script>
     <script>
         // Firebase configuration
         const firebaseConfig = {
@@ -504,11 +493,6 @@
                 bearing: 0,
                 antialias: true
             });
-            
-            // Remove duplicate labels when style loads
-            map.on('style.load', () => {
-                hideDuplicateLabels();
-            });
 
             // Add navigation control
             map.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -525,9 +509,6 @@
 
                 // Setup 3D buildings layer (initially hidden)
                 setupBuildingsLayer();
-                
-                // Setup traffic layer (initially hidden)
-                setupTrafficLayer();
             });
 
             // Setup control event listeners
@@ -550,81 +531,6 @@
             }, (error) => {
                 console.error('Error loading truck schedules:', error);
             });
-            
-            // Also start listening for driver locations
-            loadDriverLocations();
-        }
-
-        // Driver location tracking with optimization
-        let driverMarkers = {};
-        let locationUpdateTimeout = null;
-        let lastLocationUpdate = {};
-        const LOCATION_UPDATE_THROTTLE = 5000; // Only update every 5 seconds
-        
-        function loadDriverLocations() {
-            console.log('Starting driver location tracking...');
-            
-            // Listen for active driver locations with throttling
-            db.collection('driver_locations')
-                .where('isActive', '==', true)
-                .where('lastUpdate', '>', new Date(Date.now() - 30 * 60 * 1000)) // Only show drivers active in last 30 min
-                .onSnapshot((snapshot) => {
-                    snapshot.forEach((doc) => {
-                        const driverId = doc.id;
-                        const locationData = doc.data();
-                        
-                        // Throttle updates per driver
-                        const now = Date.now();
-                        if (lastLocationUpdate[driverId] && (now - lastLocationUpdate[driverId]) < LOCATION_UPDATE_THROTTLE) {
-                            return;
-                        }
-                        lastLocationUpdate[driverId] = now;
-                        
-                        updateDriverMarker(driverId, locationData);
-                    });
-                }, (error) => {
-                    console.error('Error loading driver locations:', error);
-                });
-        }
-        
-        function updateDriverMarker(driverId, locationData) {
-            // Remove old marker if exists
-            if (driverMarkers[driverId]) {
-                driverMarkers[driverId].remove();
-            }
-            
-            // Create truck icon element
-            const el = document.createElement('div');
-            el.className = 'driver-marker';
-            el.innerHTML = `
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="#3B82F6" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); transform: rotate(${locationData.heading || 0}deg);">
-                    <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
-                </svg>
-            `;
-            
-            // Create popup with driver details
-            const popup = new maplibregl.Popup({ offset: 25 })
-                .setHTML(`
-                    <div style="min-width: 200px;">
-                        <strong>Driver: ${locationData.driverName || 'Unknown'}</strong><br/>
-                        <strong>Truck:</strong> ${locationData.truckId || 'Not Assigned'}<br/>
-                        <strong>Status:</strong> ${locationData.status || 'Active'}<br/>
-                        <strong>Speed:</strong> ${locationData.speed ? locationData.speed.toFixed(1) + ' km/h' : 'N/A'}<br/>
-                        <strong>Last Update:</strong> ${locationData.lastUpdate ? new Date(locationData.lastUpdate.seconds * 1000).toLocaleTimeString() : 'Unknown'}<br/>
-                        ${locationData.scheduleDetails ? `
-                            <hr style="margin: 8px 0; border: none; border-top: 1px solid #e5e7eb;">
-                            <strong>Route:</strong> ${locationData.scheduleDetails.streets ? locationData.scheduleDetails.streets.slice(0, 3).join(', ') : 'N/A'}<br/>
-                            <strong>Time:</strong> ${locationData.scheduleDetails.startTime} - ${locationData.scheduleDetails.endTime}
-                        ` : ''}
-                    </div>
-                `);
-            
-            const marker = new maplibregl.Marker(el)
-                .setLngLat([locationData.longitude, locationData.latitude])
-                .setPopup(popup)
-                .addTo(map);
-            
-            driverMarkers[driverId] = marker;
         }
 
         function addTruckMarkers() {
@@ -772,67 +678,6 @@
                 }
             }
         }
-        
-        function hideDuplicateLabels() {
-            try {
-                const style = map.getStyle();
-                if (!style || !style.layers) return;
-                
-                // Hide duplicate text/symbol layers while keeping roads and 3D features
-                style.layers.forEach((layer, index) => {
-                    if (layer.type === 'symbol' && 
-                        (layer.layout && layer.layout['text-field']) &&
-                        (layer.id.includes('place') || 
-                         layer.id.includes('poi') || 
-                         layer.id.includes('label') ||
-                         layer.id.includes('text'))) {
-                        
-                        // Only hide secondary label layers, keep primary ones
-                        if (index > 10) { // Keep first few essential label layers
-                            map.setLayoutProperty(layer.id, 'visibility', 'none');
-                        }
-                    }
-                });
-                
-                console.log('Duplicate labels hidden');
-            } catch (error) {
-                console.warn('Could not hide duplicate labels:', error);
-            }
-        }
-        
-        function setupTrafficLayer() {
-            // WARNING: This uses unofficial Google Maps tiles which may violate ToS
-            // For production, use official APIs like HERE, TomTom, or Mapbox Traffic
-            try {
-                if (!map.getSource('google-traffic')) {
-                    map.addSource('google-traffic', {
-                        'type': 'raster',
-                        'tiles': [
-                            'https://mt0.google.com/vt/lyrs=h@159000000,traffic|seconds_into_week:-1&hl=en&gl=ph&x={x}&y={y}&z={z}'
-                        ],
-                        'tileSize': 256,
-                        'attribution': 'Unofficial Google Maps data'
-                    });
-                }
-                
-                map.addLayer({
-                    'id': 'google-traffic-layer',
-                    'type': 'raster',
-                    'source': 'google-traffic',
-                    'layout': {
-                        'visibility': 'visible'
-                    },
-                    'paint': {
-                        'raster-opacity': 0.8
-                    }
-                });
-                
-                console.log('Traffic layer setup (unofficial)');
-                
-            } catch (error) {
-                console.warn('Could not setup traffic layer:', error);
-            }
-        }
 
         function setupMapControls() {
             // 3D Toggle
@@ -928,10 +773,9 @@
                     btn.classList.remove('active');
                 }
                 
-                // Re-add markers, buildings, and traffic after style change
+                // Re-add markers and buildings after style change
                 map.once('styledata', () => {
                     loadTruckSchedules();
-                    hideDuplicateLabels(); // Hide duplicate labels on style change
                     if (isBuildingsEnabled) {
                         setupBuildingsLayer();
                         setTimeout(() => {
@@ -940,11 +784,8 @@
                             }
                         }, 100);
                     }
-                    // Always show traffic after style change
-                    setupTrafficLayer();
                 });
             });
-            
 
             // Fullscreen Toggle
             document.getElementById('toggleFullscreen').addEventListener('click', () => {
@@ -967,442 +808,31 @@
             });
         }
 
-
         function editAnnouncement() {
             document.getElementById('announcementSection').style.display = 'none';
             document.getElementById('editAnnouncementSection').style.display = 'block';
-            document.getElementById('announcementTextarea').value = "";
-            document.getElementById('charCount').textContent = "0";
-            
-            // Add character counter
-            const textarea = document.getElementById('announcementTextarea');
-            textarea.addEventListener('input', function() {
-                document.getElementById('charCount').textContent = this.value.length;
-            });
+            document.getElementById('announcementTextarea').value = currentAnnouncement === "No announcement yet." ? "" : currentAnnouncement;
         }
 
-        async function sendAnnouncement() {
-            const text = document.getElementById('announcementTextarea').value.trim();
-            const sendBtn = document.getElementById('sendAnnouncementBtn');
-            
-            if (!text) {
-                showError('Please enter an announcement message.');
-                return;
-            }
-
-            // Get and validate duration
-            const durationHours = parseInt(document.getElementById('announcementDuration').value);
-            if (isNaN(durationHours) || durationHours < 1 || durationHours > 24) {
-                showError('Please enter a valid duration between 1 and 24 hours.');
-                return;
-            }
-
-            // Disable button and show loading state
-            sendBtn.disabled = true;
-            const isEditing = currentEditingId !== null;
-            sendBtn.innerHTML = `
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; animation: spin 1s linear infinite;">
-                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                </svg>
-                ${isEditing ? 'Updating...' : 'Sending...'}
-            `;
-
-            try {
-                const now = new Date();
-                
-                if (isEditing) {
-                    // Update existing announcement
-                    const updateData = {
-                        message: text,
-                        updatedAt: firebase.firestore.Timestamp.fromDate(now)
-                    };
-                    
-                    await db.collection('announcements').doc(currentEditingId).update(updateData);
-                    showSuccess('Announcement updated successfully!');
-                } else {
-                    // Create new announcement with custom duration
-                    const expiryDate = new Date(now.getTime() + durationHours * 60 * 60 * 1000);
-                    
-                    const announcementData = {
-                        message: text,
-                        createdAt: firebase.firestore.Timestamp.fromDate(now),
-                        expiresAt: firebase.firestore.Timestamp.fromDate(expiryDate),
-                        createdBy: 'Administrator',
-                        isActive: true
-                    };
-
-                    await db.collection('announcements').add(announcementData);
-                    showSuccess('Announcement sent successfully!');
-                }
-                
-                cancelAnnouncement();
-
-            } catch (error) {
-                console.error('Error with announcement:', error);
-                showError(`Error ${isEditing ? 'updating' : 'sending'} announcement. Please try again.`);
-            } finally {
-                // Reset button
-                sendBtn.disabled = false;
-                sendBtn.innerHTML = `
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
-                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                        <polygon points="22,2 15,22 11,13 2,9"></polygon>
-                    </svg>
-                    ${isEditing ? 'Update' : 'Send'}
-                `;
-            }
-        }
-
-        function displayAnnouncementItem(announcement, id) {
-            const createdAt = announcement.createdAt instanceof Date ? announcement.createdAt : announcement.createdAt.toDate();
-            const expiresAt = announcement.expiresAt instanceof Date ? announcement.expiresAt : announcement.expiresAt.toDate();
-            
-            return `
-                <div class="announcement-item" style="margin-bottom: 12px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f9fafb; position: relative;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-                        <div style="flex: 1;">
-                            <p class="annc-body" style="margin: 0 0 8px 0;">${announcement.message}</p>
-                            <div class="annc-meta">
-                                <small style="color: #6b7280; font-size: 12px;">
-                                    Posted: ${createdAt.toLocaleString()} | 
-                                    Expires: ${expiresAt.toLocaleString()}
-                                </small>
-                            </div>
-                        </div>
-                        <div style="display: flex; gap: 6px; flex-shrink: 0;">
-                            <button onclick="editAnnouncement('${id}', '${announcement.message.replace(/'/g, "\\'")}')"
-                                style="padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 4px; background: white; cursor: pointer; font-size: 12px; color: #374151; transition: all 0.2s;"
-                                onmouseover="this.style.background='#f9fafb'"
-                                onmouseout="this.style.background='white'">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                </svg>
-                                Edit
-                            </button>
-                            <button onclick="deleteAnnouncement('${id}')"
-                                style="padding: 4px 8px; border: 1px solid #dc2626; border-radius: 4px; background: white; cursor: pointer; font-size: 12px; color: #dc2626; transition: all 0.2s;"
-                                onmouseover="this.style.background='#fee2e2'"
-                                onmouseout="this.style.background='white'">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="3,6 5,6 21,6"></polyline>
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                    <line x1="10" y1="11" x2="10" y2="17"></line>
-                                    <line x1="14" y1="11" x2="14" y2="17"></line>
-                                </svg>
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function loadAllAnnouncements() {
-            console.log('Loading all announcements...');
-            
-            // First try to load all announcements without complex queries
-            db.collection('announcements')
-                .onSnapshot((snapshot) => {
-                    console.log('Raw announcements snapshot:', snapshot.size, 'documents');
-                    const announcementsList = document.getElementById('announcementsList');
-                    
-                    if (snapshot.empty) {
-                        announcementsList.innerHTML = '<p class="annc-body" style="color: #6b7280;">No announcements yet.</p>';
-                        return;
-                    }
-                    
-                    const now = new Date();
-                    let html = '';
-                    let activeCount = 0;
-                    
-                    snapshot.forEach((doc) => {
-                        const announcement = doc.data();
-                        console.log('Processing announcement:', announcement);
-                        
-                        // Check if announcement is still active
-                        const expiresAt = announcement.expiresAt.toDate();
-                        const isActive = announcement.isActive && expiresAt > now;
-                        
-                        if (isActive) {
-                            html += displayAnnouncementItem(announcement, doc.id);
-                            activeCount++;
-                        }
-                    });
-                    
-                    console.log('Active announcements:', activeCount);
-                    
-                    if (activeCount === 0) {
-                        announcementsList.innerHTML = '<p class="annc-body" style="color: #6b7280;">No active announcements.</p>';
-                    } else {
-                        announcementsList.innerHTML = html;
-                    }
-                }, (error) => {
-                    console.error('Error loading announcements:', error);
-                    document.getElementById('announcementsList').innerHTML = '<p class="annc-body" style="color: #dc2626;">Error loading announcements: ' + error.message + '</p>';
-                });
-        }
-
-        async function archiveExpiredAnnouncements() {
-            try {
-                const now = firebase.firestore.Timestamp.now();
-                const expiredSnapshot = await db.collection('announcements')
-                    .where('expiresAt', '<=', now)
-                    .where('isActive', '==', true)
-                    .get();
-
-                const batch = db.batch();
-                const archiveBatch = db.batch();
-                
-                for (const doc of expiredSnapshot.docs) {
-                    const data = doc.data();
-                    // Archive the announcement
-                    await db.collection('archived_announcements').add({
-                        ...data,
-                        archivedAt: now,
-                        originalId: doc.id
-                    });
-                    
-                    // Update the original to mark as archived
-                    batch.update(doc.ref, {
-                        isActive: false,
-                        archivedAt: now
-                    });
-                }
-
-                if (!expiredSnapshot.empty) {
-                    await batch.commit();
-                    console.log(`Archived ${expiredSnapshot.size} expired announcements`);
-                }
-            } catch (error) {
-                console.error('Error archiving expired announcements:', error);
-            }
+        function saveAnnouncement() {
+            const newText = document.getElementById('announcementTextarea').value.trim();
+            currentAnnouncement = newText || "No announcement yet.";
+            document.getElementById('announcementText').textContent = currentAnnouncement;
+            cancelAnnouncement();
         }
 
         function cancelAnnouncement() {
             document.getElementById('announcementSection').style.display = 'block';
             document.getElementById('editAnnouncementSection').style.display = 'none';
-            currentEditingId = null;
-        }
-
-        function viewArchivedAnnouncements() {
-            // Create modal for archived announcements
-            const modal = document.createElement('div');
-            modal.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0, 0, 0, 0.5);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 10000;
-            `;
-            
-            modal.innerHTML = `
-                <div style="background: white; border-radius: 12px; padding: 24px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h3 style="margin: 0; font-size: 20px; font-weight: 600;">Archived Announcements</h3>
-                        <button onclick="this.closest('div[style*='position: fixed']').remove()" style="background: none; border: none; cursor: pointer; padding: 4px;">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                        </button>
-                    </div>
-                    <div id="archivedAnnouncementsList" style="min-height: 200px;">
-                        <div style="text-align: center; padding: 20px; color: #6b7280;">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin: 0 auto; animation: spin 1s linear infinite;">
-                                <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                            </svg>
-                            <p style="margin-top: 8px;">Loading archived announcements...</p>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-            
-            // Load archived announcements
-            db.collection('archived_announcements')
-                .orderBy('archivedAt', 'desc')
-                .limit(20)
-                .get()
-                .then((snapshot) => {
-                    const listContainer = document.getElementById('archivedAnnouncementsList');
-                    
-                    if (snapshot.empty) {
-                        listContainer.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No archived announcements.</p>';
-                        return;
-                    }
-                    
-                    let html = '';
-                    snapshot.forEach((doc) => {
-                        const data = doc.data();
-                        const createdAt = data.createdAt.toDate();
-                        const archivedAt = data.archivedAt.toDate();
-                        
-                        html += `
-                            <div style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 12px; background: #f9fafb;">
-                                <p style="margin: 0 0 8px 0; color: #374151;">${data.message}</p>
-                                <small style="color: #6b7280; font-size: 12px;">
-                                    Created: ${createdAt.toLocaleString()} | Archived: ${archivedAt.toLocaleString()}
-                                </small>
-                            </div>
-                        `;
-                    });
-                    
-                    listContainer.innerHTML = html;
-                })
-                .catch((error) => {
-                    console.error('Error loading archived announcements:', error);
-                    document.getElementById('archivedAnnouncementsList').innerHTML = 
-                        '<p style="text-align: center; color: #dc2626; padding: 20px;">Error loading archived announcements.</p>';
-                });
-        }
-
-        let currentEditingId = null;
-
-        function editAnnouncement(id, message) {
-            if (typeof id === 'undefined') {
-                // This is creating a new announcement
-                document.getElementById('announcementSection').style.display = 'none';
-                document.getElementById('editAnnouncementSection').style.display = 'block';
-                document.getElementById('announcementTextarea').value = "";
-                document.getElementById('charCount').textContent = "0";
-                currentEditingId = null;
-            } else {
-                // This is editing an existing announcement
-                document.getElementById('announcementSection').style.display = 'none';
-                document.getElementById('editAnnouncementSection').style.display = 'block';
-                document.getElementById('announcementTextarea').value = message;
-                document.getElementById('charCount').textContent = message.length;
-                currentEditingId = id;
-            }
-            
-            // Add character counter
-            const textarea = document.getElementById('announcementTextarea');
-            textarea.removeEventListener('input', updateCharCount); // Remove existing listener
-            textarea.addEventListener('input', updateCharCount);
-        }
-
-        function updateCharCount() {
-            document.getElementById('charCount').textContent = this.value.length;
-        }
-
-        async function deleteAnnouncement(id) {
-            showConfirm(
-                'Are you sure you want to delete this announcement? This action cannot be undone.',
-                async () => {
-                    try {
-                        await db.collection('announcements').doc(id).delete();
-                        showSuccess('Announcement deleted successfully!');
-                    } catch (error) {
-                        console.error('Error deleting announcement:', error);
-                        showError('Error deleting announcement. Please try again.');
-                    }
-                }
-            );
-        }
-
-        // Load recent reports from Firebase
-        function loadRecentReports() {
-            console.log('Loading recent reports from Firebase...');
-            
-            db.collection('reports')
-                .orderBy('createdAt', 'desc')
-                .limit(5)
-                .onSnapshot((snapshot) => {
-                    const reportsList = document.getElementById('recentReportsList');
-                    
-                    if (snapshot.empty) {
-                        reportsList.innerHTML = `
-                            <div style="text-align: center; padding: 20px; color: #6b7280;">
-                                <p>No reports yet.</p>
-                            </div>
-                        `;
-                        document.getElementById('totalReportsCount').textContent = '0';
-                        document.getElementById('criticalIssuesCount').textContent = '0';
-                        return;
-                    }
-                    
-                    let html = '';
-                    let totalReports = 0;
-                    let criticalCount = 0;
-                    
-                    // Get total count and critical issues
-                    db.collection('reports').get().then((allSnapshot) => {
-                        totalReports = allSnapshot.size;
-                        document.getElementById('totalReportsCount').textContent = totalReports;
-                        
-                        // Count critical issues (high priority pending reports)
-                        allSnapshot.forEach((doc) => {
-                            const report = doc.data();
-                            if (report.status === 'pending' && report.priority === 'high') {
-                                criticalCount++;
-                            }
-                        });
-                        document.getElementById('criticalIssuesCount').textContent = criticalCount;
-                    });
-                    
-                    snapshot.forEach((doc) => {
-                        const report = doc.data();
-                        const createdAt = report.createdAt ? report.createdAt.toDate() : new Date();
-                        
-                        // Determine status pill color
-                        let pillClass = 'pill-pending';
-                        if (report.status === 'resolved') {
-                            pillClass = 'pill-success';
-                        } else if (report.status === 'unresolved') {
-                            pillClass = 'pill-danger';
-                        }
-                        
-                        html += `
-                            <div class="report-row">
-                                <div class="report-main">
-                                    <div class="report-title">${report.title || 'Untitled Report'}</div>
-                                    <div class="report-sub">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                            <circle cx="12" cy="10" r="3"></circle>
-                                        </svg>
-                                        <span>${report.location || 'Unknown Location'}</span>
-                                    </div>
-                                    <div class="report-date">${createdAt.toLocaleDateString()}</div>
-                                </div>
-                                <span class="pill ${pillClass}">${report.status ? report.status.charAt(0).toUpperCase() + report.status.slice(1) : 'Pending'}</span>
-                            </div>
-                        `;
-                    });
-                    
-                    reportsList.innerHTML = html;
-                }, (error) => {
-                    console.error('Error loading reports:', error);
-                    document.getElementById('recentReportsList').innerHTML = `
-                        <div style="text-align: center; padding: 20px; color: #dc2626;">
-                            <p>Error loading reports</p>
-                        </div>
-                    `;
-                });
         }
 
         // Initialize map when page loads
         document.addEventListener('DOMContentLoaded', function() {
             initMap();
             loadUserCounts(); // Load user role counts
-            loadAllAnnouncements(); // Load all announcements
-            loadRecentReports(); // Load recent reports from Firebase
             
             // Setup toggle button event listener
             document.getElementById('toggleUserView').addEventListener('click', toggleUserBreakdown);
-            
-            // Archive expired announcements on load
-            archiveExpiredAnnouncements();
-            
-            // Set up periodic archiving every hour
-            setInterval(archiveExpiredAnnouncements, 60 * 60 * 1000);
         });
     </script>
 </body>

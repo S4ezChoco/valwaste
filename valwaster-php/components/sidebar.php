@@ -55,18 +55,6 @@ $current_page = basename($_SERVER['PHP_SELF'], '.php');
       <span class="label">Report Management</span>
     </a>
     
-    <a href="truck-management.php" class="nav-item <?php echo $current_page === 'truck-management' ? 'active' : ''; ?>">
-      <span class="icon-left">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="1" y="3" width="15" height="13"></rect>
-          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
-          <circle cx="5.5" cy="18.5" r="2.5"></circle>
-          <circle cx="18.5" cy="18.5" r="2.5"></circle>
-        </svg>
-      </span>
-      <span class="label">Truck Management</span>
-    </a>
-    
     <a href="truck-schedule.php" class="nav-item <?php echo $current_page === 'truck-schedule' ? 'active' : ''; ?>">
       <span class="icon-left">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -90,7 +78,7 @@ $current_page = basename($_SERVER['PHP_SELF'], '.php');
   </nav>
 
   <div class="sidebar-footer">
-    <div class="account">
+    <div class="account" onclick="openProfileModal()">
       <div class="account-circle" aria-hidden="true">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -113,6 +101,37 @@ $current_page = basename($_SERVER['PHP_SELF'], '.php');
 
 <div class="backdrop" id="backdrop" onclick="closeSidebar()"></div>
 
+<!-- Profile Modal -->
+<div class="um-modal" id="profileModal" style="display: none;">
+  <div class="um-modal-card">
+    <button class="um-modal-close" onclick="closeProfileModal()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+    <h2 class="um-modal-title">Admin Profile</h2>
+    <p class="um-modal-sub">Update your profile information</p>
+    
+    <form class="um-form" id="profileForm">
+      <div class="um-field">
+        <label class="um-label">Display Name</label>
+        <input type="text" class="um-input" id="profileName" value="Admin" required>
+      </div>
+      
+      <div class="um-field">
+        <label class="um-label">Email</label>
+        <input type="email" class="um-input" id="profileEmail" readonly style="background: #f9fafb; color: #6b7280;">
+      </div>
+      
+      <div class="um-modal-actions">
+        <button type="button" class="btn-ghost" onclick="closeProfileModal()">Cancel</button>
+        <button type="submit" class="btn-primary">Save Changes</button>
+        <button type="button" class="btn-outline" onclick="resetPassword()">Reset Password</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script>
 function openSidebar() {
@@ -125,6 +144,25 @@ function closeSidebar() {
   document.getElementById('backdrop').style.display = 'none';
 }
 
+function openProfileModal() {
+  document.getElementById('profileModal').style.display = 'grid';
+  // Load current user data from Firebase
+  loadUserProfile();
+}
+
+function closeProfileModal() {
+  document.getElementById('profileModal').style.display = 'none';
+}
+
+function loadUserProfile() {
+  // This will be implemented with Firebase Auth
+  // For now, just show placeholder data
+}
+
+function resetPassword() {
+  alert('Password reset email will be sent to your email address.');
+  // This will be implemented with Firebase Auth
+}
 
 async function signOut() {
   try {
