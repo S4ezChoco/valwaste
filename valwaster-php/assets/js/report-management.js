@@ -1,16 +1,34 @@
 // Report Management JavaScript
 
+// Firebase configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyAr5KSpYvShZrCEJLMGf7ckrbfedta3W_M",
+    authDomain: "valwaste-89930.firebaseapp.com",
+    projectId: "valwaste-89930",
+    storageBucket: "valwaste-89930.firebasestorage.app",
+    messagingSenderId: "301491189774",
+    appId: "1:301491189774:web:23f0fa68d2b264946b245f",
+    measurementId: "G-C70DHXP9FW"
+};
+
+// Initialize Firebase if not already initialized
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.firestore();
+
 // Current state
 let currentTab = 'pending';
 let currentPriority = 'All Priorities';
 let currentCategory = 'All Categories';
 let searchQuery = '';
+let reportsData = [];
 
 // Category options per tab
 const CATEGORY_OPTIONS = {
-    pending: ['All Categories', 'Missed Collection', 'Illegal Dumping', 'Complaint'],
-    resolved: ['All Categories', 'Damaged Equipment'],
-    unresolved: ['All Categories', 'Other']
+    pending: ['All Categories', 'Missed Collection', 'Illegal Dumping', 'Complaint', 'Other'],
+    resolved: ['All Categories', 'Missed Collection', 'Illegal Dumping', 'Complaint', 'Other'],
+    unresolved: ['All Categories', 'Missed Collection', 'Illegal Dumping', 'Complaint', 'Other']
 };
 
 // Tab subtitles
@@ -20,82 +38,35 @@ const TAB_SUBTITLES = {
     unresolved: 'Reports that could not be resolved and need attention'
 };
 
-// Sample data for demonstration
-const sampleReports = {
-    pending: [
-        {
-            id: 1,
-            title: 'Missed garbage collection',
-            location: 'Barangay Marulas',
-            reportedBy: 'Juan Dela Cruz',
-            priority: 'High',
-            category: 'Missed Collection',
-            date: '2024-01-15',
-            status: 'Pending',
-            description: 'The garbage truck did not arrive at the scheduled time. Residents are complaining about the accumulating waste in the area.',
-            images: ['https://via.placeholder.com/300x300/ff6b6b/ffffff?text=Garbage+Overflow', 'https://via.placeholder.com/300x300/4ecdc4/ffffff?text=Street+View']
-        },
-        {
-            id: 2,
-            title: 'Illegal dumping near park',
-            location: 'Barangay Karuhatan',
-            reportedBy: 'Maria Santos',
-            priority: 'Medium',
-            category: 'Illegal Dumping',
-            date: '2024-01-14',
-            status: 'Pending',
-            description: 'Someone has been dumping construction waste near the children\'s playground. This poses a safety hazard.',
-            images: ['https://via.placeholder.com/300x300/45b7d1/ffffff?text=Illegal+Dump']
-        },
-        {
-            id: 3,
-            title: 'Broken waste bin',
-            location: 'Barangay Gen. T. de Leon',
-            reportedBy: 'Pedro Martinez',
-            priority: 'Low',
-            category: 'Complaint',
-            date: '2024-01-13',
-            status: 'Pending',
-            description: 'The public waste bin on Main Street is damaged and needs replacement.',
-            images: []
-        }
-    ],
-    resolved: [
-        {
-            id: 4,
-            title: 'Overflowing dumpster',
-            location: 'Barangay Paso de Blas',
-            reportedBy: 'Ana Reyes',
-            priority: 'High',
-            category: 'Missed Collection',
-            date: '2024-01-10',
-            status: 'Resolved',
-            description: 'Dumpster was overflowing for several days. Issue has been resolved.',
-            images: ['https://via.placeholder.com/300x300/95e1d3/ffffff?text=Fixed+Dumpster']
-        }
-    ],
-    unresolved: [
-        {
-            id: 5,
-            title: 'Persistent odor issue',
-            location: 'Barangay Arkong Bato',
-            reportedBy: 'Roberto Cruz',
-            priority: 'Medium',
-            category: 'Other',
-            date: '2024-01-08',
-            status: 'Unresolved',
-            description: 'Strong odor persists despite multiple attempts to resolve. May require specialized treatment.',
-            images: []
-        }
-    ]
-};
-
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     updateCategoryOptions();
-    updateReportCounts();
-    displayReports();
+    loadReportsFromFirebase();
 });
+
+// Load reports from Firebase
+function loadReportsFromFirebase() {
+    console.log('Loading reports from Firebase...');
+    
+    db.collection('reports').onSnapshot((snapshot) => {
+        reportsData = [];
+        snapshot.forEach((doc) => {
+            const report = { id: doc.id, ...doc.data() };
+            // Convert Firebase timestamp to Date string
+            if (report.createdAt) {
+                report.date = report.createdAt.toDate().toISOString().split('T')[0];
+            }
+            reportsData.push(report);
+        });
+        
+        console.log('Loaded reports:', reportsData.length);
+        updateReportCounts();
+        displayReports();
+    }, (error) => {
+        console.error('Error loading reports:', error);
+        showError('Failed to load reports from server');
+    });
+}
 
 // Tab switching
 function switchTab(tab) {
@@ -210,26 +181,29 @@ function searchReports() {
 
 // Refresh reports
 function refreshReports() {
-    // In a real application, this would fetch new data from the server
     console.log('Refreshing reports...');
-    displayReports();
+    loadReportsFromFirebase();
 }
 
 // Update report counts
 function updateReportCounts() {
-    document.getElementById('pending-count').textContent = sampleReports.pending.length;
-    document.getElementById('resolved-count').textContent = sampleReports.resolved.length;
-    document.getElementById('unresolved-count').textContent = sampleReports.unresolved.length;
+    const pending = reportsData.filter(r => r.status === 'pending').length;
+    const resolved = reportsData.filter(r => r.status === 'resolved').length;
+    const unresolved = reportsData.filter(r => r.status === 'unresolved').length;
+    
+    document.getElementById('pending-count').textContent = pending;
+    document.getElementById('resolved-count').textContent = resolved;
+    document.getElementById('unresolved-count').textContent = unresolved;
 }
 
 // Display reports based on current filters
 function displayReports() {
     const tbody = document.getElementById('reports-tbody');
-    let reports = sampleReports[currentTab] || [];
+    let reports = reportsData.filter(r => r.status === currentTab);
     
     // Apply filters
     if (currentPriority !== 'All Priorities') {
-        reports = reports.filter(report => report.priority === currentPriority);
+        reports = reports.filter(report => report.priority && report.priority.toLowerCase() === currentPriority.toLowerCase());
     }
     
     if (currentCategory !== 'All Categories') {
@@ -238,9 +212,9 @@ function displayReports() {
     
     if (searchQuery) {
         reports = reports.filter(report => 
-            report.title.toLowerCase().includes(searchQuery) ||
-            report.location.toLowerCase().includes(searchQuery) ||
-            report.reportedBy.toLowerCase().includes(searchQuery)
+            (report.title && report.title.toLowerCase().includes(searchQuery)) ||
+            (report.location && report.location.toLowerCase().includes(searchQuery)) ||
+            (report.reportedBy && report.reportedBy.toLowerCase().includes(searchQuery))
         );
     }
     
@@ -250,15 +224,15 @@ function displayReports() {
     } else {
         tbody.innerHTML = reports.map(report => `
             <tr>
-                <td>${report.title}</td>
-                <td>${report.location}</td>
-                <td>${report.reportedBy}</td>
-                <td><span class="priority-badge priority-${report.priority.toLowerCase()}">${report.priority}</span></td>
-                <td><span class="category-badge">${report.category}</span></td>
+                <td>${report.title || 'Untitled'}</td>
+                <td>${report.location || 'Unknown'}</td>
+                <td>${report.reportedBy || 'Anonymous'}</td>
+                <td><span class="priority-badge priority-${(report.priority || 'low').toLowerCase()}">${report.priority || 'Low'}</span></td>
+                <td><span class="category-badge">${report.category || 'Other'}</span></td>
                 <td>${formatDate(report.date)}</td>
                 <td class="col-actions">
                     <div class="action-buttons">
-                        <button class="btn-view" onclick="viewReport(${report.id})">View</button>
+                        <button class="btn-view" onclick="viewReport('${report.id}')">View</button>
                         ${getActionButtons(report, currentTab)}
                     </div>
                 </td>
@@ -280,25 +254,20 @@ function formatDate(dateString) {
 // Get action buttons based on report status and current tab
 function getActionButtons(report, tab) {
     if (tab === 'pending') {
-        return `<button class="btn-resolve" onclick="resolveReport(${report.id})">Resolve</button>
-                <button class="btn-unresolve" onclick="unresolveReport(${report.id})">Mark Unresolved</button>`;
+        return `<button class="btn-resolve" onclick="resolveReport('${report.id}')">Resolve</button>
+                <button class="btn-unresolve" onclick="unresolveReport('${report.id}')">Mark Unresolved</button>`;
     } else if (tab === 'resolved') {
-        return `<button class="btn-unresolve" onclick="unresolveReport(${report.id})">Mark Unresolved</button>`;
+        return `<button class="btn-unresolve" onclick="unresolveReport('${report.id}')">Mark Unresolved</button>`;
     } else if (tab === 'unresolved') {
-        return `<button class="btn-resolve" onclick="resolveReport(${report.id})">Mark Resolved</button>`;
+        return `<button class="btn-resolve" onclick="resolveReport('${report.id}')">Mark Resolved</button>`;
     }
     return '';
 }
 
-// Find report by ID across all tabs
+// Find report by ID
 function findReportById(reportId) {
-    for (const tab in sampleReports) {
-        const report = sampleReports[tab].find(r => r.id === reportId);
-        if (report) {
-            return { report, currentTab: tab };
-        }
-    }
-    return null;
+    const report = reportsData.find(r => r.id === reportId);
+    return report ? { report, currentTab: report.status } : null;
 }
 
 // View report details
@@ -428,29 +397,52 @@ function unresolveReportFromModal(reportId) {
 }
 
 // Move report between tabs
-function moveReport(reportId, targetStatus) {
+async function moveReport(reportId, targetStatus) {
     const result = findReportById(reportId);
     if (!result) {
         console.error('Report not found:', reportId);
         return;
     }
     
-    const { report, currentTab } = result;
-    
-    // Remove from current tab
-    const currentIndex = sampleReports[currentTab].findIndex(r => r.id === reportId);
-    if (currentIndex > -1) {
-        sampleReports[currentTab].splice(currentIndex, 1);
+    try {
+        // Update in Firebase
+        await db.collection('reports').doc(reportId).update({
+            status: targetStatus,
+            updatedAt: firebase.firestore.Timestamp.now()
+        });
+        
+        // Update local data
+        const report = reportsData.find(r => r.id === reportId);
+        if (report) {
+            report.status = targetStatus;
+        }
+        
+        // Update UI
+        updateReportCounts();
+        displayReports();
+        
+        // Show success message
+        showSuccess(`Report ${targetStatus === 'resolved' ? 'resolved' : targetStatus === 'unresolved' ? 'marked as unresolved' : 'updated'} successfully`);
+    } catch (error) {
+        console.error('Error updating report:', error);
+        showError('Failed to update report status');
     }
-    
-    // Update status and add to target tab
-    report.status = targetStatus.charAt(0).toUpperCase() + targetStatus.slice(1);
-    sampleReports[targetStatus].push(report);
-    
-    // Update UI
-    updateReportCounts();
-    displayReports();
-    
-    // Show success message
-    console.log(`Report ${reportId} moved to ${targetStatus}`);
+}
+
+// Show success message
+function showSuccess(message) {
+    if (typeof window.showNotification === 'function') {
+        window.showNotification(message, 'success');
+    } else {
+        console.log('Success:', message);
+    }
+}
+
+// Show error message
+function showError(message) {
+    if (typeof window.showNotification === 'function') {
+        window.showNotification(message, 'error');
+    } else {
+        console.error('Error:', message);
+    }
 }

@@ -113,7 +113,10 @@ function createTruckCard(truck) {
     return `
         <div class="truck-card" data-truck-id="${truck.id}">
             <div class="truck-header">
-                <div class="truck-name">${truck.name}</div>
+                <div class="truck-name">
+                    ${truck.name}
+                    <span class="truck-size-badge ${truck.size || 'small'}">${truck.size || 'small'}</span>
+                </div>
                 <div class="truck-status ${truck.status}">${truck.status.replace('-', ' ')}</div>
             </div>
             
@@ -125,6 +128,10 @@ function createTruckCard(truck) {
                 <div class="truck-detail">
                     <span class="label">Capacity:</span>
                     <span class="value">${truck.capacity} tons</span>
+                </div>
+                <div class="truck-detail">
+                    <span class="label">Size:</span>
+                    <span class="value">${truck.size === 'big' ? 'Big (≥ 3 tons)' : 'Small (< 3 tons)'}</span>
                 </div>
                 ${truck.model ? `
                     <div class="truck-detail">
@@ -224,6 +231,7 @@ async function handleAddTruck(event) {
         licensePlate: document.getElementById('truck-plate').value.trim(),
         capacity: parseFloat(document.getElementById('truck-capacity').value),
         model: document.getElementById('truck-model').value.trim(),
+        size: document.getElementById('truck-size').value,
         status: document.getElementById('truck-status').value,
         notes: document.getElementById('truck-notes').value.trim(),
         createdAt: new Date().toISOString(),
@@ -257,14 +265,18 @@ async function handleAddTruck(event) {
 // Edit truck function
 async function editTruck(truckId) {
     const truck = allTrucks.find(t => t.id === truckId);
-    if (!truck) return;
+    if (!truck) {
+        showError('Truck not found');
+        return;
+    }
     
-    // Populate form
+    // Populate edit form
     document.getElementById('edit-truck-id').value = truck.id;
     document.getElementById('edit-truck-name').value = truck.name;
     document.getElementById('edit-truck-plate').value = truck.licensePlate;
     document.getElementById('edit-truck-capacity').value = truck.capacity;
     document.getElementById('edit-truck-model').value = truck.model || '';
+    document.getElementById('edit-truck-size').value = truck.size || 'small';
     document.getElementById('edit-truck-status').value = truck.status;
     document.getElementById('edit-truck-notes').value = truck.notes || '';
     
@@ -280,6 +292,7 @@ async function handleEditTruck(event) {
         licensePlate: document.getElementById('edit-truck-plate').value.trim(),
         capacity: parseFloat(document.getElementById('edit-truck-capacity').value),
         model: document.getElementById('edit-truck-model').value.trim(),
+        size: document.getElementById('edit-truck-size').value,
         status: document.getElementById('edit-truck-status').value,
         notes: document.getElementById('edit-truck-notes').value.trim(),
         updatedAt: new Date().toISOString()

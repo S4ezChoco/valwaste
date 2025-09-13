@@ -224,7 +224,13 @@
         </div>
     </div>
 
+    <!-- Firebase CDN -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    
     <script type="module" src="assets/js/auth.js"></script>
+    <script src="assets/js/notifications.js"></script>
     <script src="assets/js/report-management.js"></script>
 </body>
 </html>

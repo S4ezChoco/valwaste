@@ -63,6 +63,26 @@
             color: #dc2626;
         }
 
+        .truck-size-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 8px;
+        }
+
+        .truck-size-badge.small {
+            background: #e0e7ff;
+            color: #4338ca;
+        }
+
+        .truck-size-badge.big {
+            background: #fce7f3;
+            color: #a21caf;
+        }
+
         .truck-details {
             display: flex;
             flex-direction: column;
@@ -351,11 +371,11 @@
                         <input type="text" class="um-input" id="truck-model" placeholder="e.g., Isuzu 2020">
                     </label>
                     <label class="um-field">
-                        <span class="um-label">Status *</span>
+                        <span class="um-label">Truck Size *</span>
                         <div class="um-select-wrap">
-                            <select class="um-select" id="truck-status" required>
-                                <option value="available">Available</option>
-                                <option value="maintenance">Maintenance</option>
+                            <select class="um-select" id="truck-size" required>
+                                <option value="small">Small (< 3 tons)</option>
+                                <option value="big">Big (≥ 3 tons)</option>
                             </select>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="um-select-caret">
                                 <polyline points="6 9 12 15 18 9"></polyline>
@@ -363,6 +383,19 @@
                         </div>
                     </label>
                 </div>
+
+                <label class="um-field">
+                    <span class="um-label">Status *</span>
+                    <div class="um-select-wrap">
+                        <select class="um-select" id="truck-status" required>
+                            <option value="available">Available</option>
+                            <option value="maintenance">Maintenance</option>
+                        </select>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="um-select-caret">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                </label>
 
                 <label class="um-field">
                     <span class="um-label">Notes</span>
@@ -415,12 +448,11 @@
                         <input type="text" class="um-input" id="edit-truck-model">
                     </label>
                     <label class="um-field">
-                        <span class="um-label">Status *</span>
+                        <span class="um-label">Truck Size *</span>
                         <div class="um-select-wrap">
-                            <select class="um-select" id="edit-truck-status" required>
-                                <option value="available">Available</option>
-                                <option value="in-use">In Use</option>
-                                <option value="maintenance">Maintenance</option>
+                            <select class="um-select" id="edit-truck-size" required>
+                                <option value="small">Small (< 3 tons)</option>
+                                <option value="big">Big (≥ 3 tons)</option>
                             </select>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="um-select-caret">
                                 <polyline points="6 9 12 15 18 9"></polyline>
@@ -428,6 +460,20 @@
                         </div>
                     </label>
                 </div>
+
+                <label class="um-field">
+                    <span class="um-label">Status *</span>
+                    <div class="um-select-wrap">
+                        <select class="um-select" id="edit-truck-status" required>
+                            <option value="available">Available</option>
+                            <option value="in-use">In Use</option>
+                            <option value="maintenance">Maintenance</option>
+                        </select>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="um-select-caret">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                </label>
 
                 <label class="um-field">
                     <span class="um-label">Notes</span>

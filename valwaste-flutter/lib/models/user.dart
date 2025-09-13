@@ -86,25 +86,33 @@ class UserModel {
     return '';
   }
 
-  // Parse role from string
+  // Parse role from string - handle both Firebase and PHP roles
   static UserRole _parseRole(dynamic roleData) {
     if (roleData == null) return UserRole.resident;
 
-    String roleString = roleData.toString().toLowerCase();
+    String roleString = roleData.toString().toLowerCase().trim();
+    
+    // Handle PHP admin panel roles and Firebase roles
     switch (roleString) {
       case 'resident':
         return UserRole.resident;
       case 'barangay official':
       case 'barangayofficial':
+      case 'barangay_official':
         return UserRole.barangayOfficial;
       case 'driver':
         return UserRole.driver;
+      case 'waste collector':
+      case 'wastecollector':
+      case 'waste_collector':
       case 'collector':
+      case 'palero': // Added for PHP compatibility
         return UserRole.collector;
       case 'administrator':
       case 'admin':
         return UserRole.administrator;
       default:
+        print('Unknown role: $roleString, defaulting to resident');
         return UserRole.resident;
     }
   }

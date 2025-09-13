@@ -163,7 +163,7 @@
                     <div class="card stats-card">
                         <div class="stats-meta">
                             <p class="stats-label">Total Reports</p>
-                            <h3 class="stats-value" id="totalReports">0</h3>
+                            <div class="stats-value" style="color: #333;" id="totalReportsCount">0</div>
                             <p class="stats-sub">Reports made by users</p>
                         </div>
                         <div class="stats-icon">
@@ -270,49 +270,12 @@
                     <aside class="card recent">
                         <h3 class="recent-title">Recent Reports</h3>
                         <div class="recent-list" id="recentReportsList">
-                            <div class="report-row">
-                                <div class="report-main">
-                                    <div class="report-title">Garbage overflow at Main Street</div>
-                                    <div class="report-sub">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                            <circle cx="12" cy="10" r="3"></circle>
-                                        </svg>
-                                        <span>Block 5, Main Street</span>
-                                    </div>
-                                    <div class="report-date">5/12/2023</div>
-                                </div>
-                                <span class="pill pill-pending">Pending</span>
-                            </div>
-
-                            <div class="report-row">
-                                <div class="report-main">
-                                    <div class="report-title">Truck missed scheduled collection</div>
-                                    <div class="report-sub">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                            <circle cx="12" cy="10" r="3"></circle>
-                                        </svg>
-                                        <span>Green Valley Subdivision</span>
-                                    </div>
-                                    <div class="report-date">5/11/2023</div>
-                                </div>
-                                <span class="pill pill-pending">Pending</span>
-                            </div>
-
-                            <div class="report-row">
-                                <div class="report-main">
-                                    <div class="report-title">Illegal dumping spotted</div>
-                                    <div class="report-sub">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                            <circle cx="12" cy="10" r="3"></circle>
-                                        </svg>
-                                        <span>Riverside Park</span>
-                                    </div>
-                                    <div class="report-date">5/11/2023</div>
-                                </div>
-                                <span class="pill pill-pending">Pending</span>
+                            <!-- Reports will be loaded from Firebase -->
+                            <div style="text-align: center; padding: 20px; color: #6b7280;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin: 0 auto; animation: spin 1s linear infinite;">
+                                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                                </svg>
+                                <p style="margin-top: 8px;">Loading reports...</p>
                             </div>
                         </div>
                         <button class="btn-outline" type="button" onclick="window.location.href='report-management.php'">
@@ -325,9 +288,19 @@
                 <section class="card annc-card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                         <h4 class="annc-title">Announcements</h4>
-                        <button type="button" class="btn-outline" onclick="editAnnouncement()">
-                            Create Announcement
-                        </button>
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" class="btn-outline" onclick="viewArchivedAnnouncements()" style="padding: 8px 16px; font-size: 14px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
+                                    <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                                    <rect x="1" y="3" width="22" height="5"></rect>
+                                    <line x1="10" y1="12" x2="14" y2="12"></line>
+                                </svg>
+                                Archive
+                            </button>
+                            <button type="button" class="btn-outline" onclick="editAnnouncement()">
+                                Create Announcement
+                            </button>
+                        </div>
                     </div>
                     
                     <div id="announcementSection">
@@ -577,6 +550,81 @@
             }, (error) => {
                 console.error('Error loading truck schedules:', error);
             });
+            
+            // Also start listening for driver locations
+            loadDriverLocations();
+        }
+
+        // Driver location tracking with optimization
+        let driverMarkers = {};
+        let locationUpdateTimeout = null;
+        let lastLocationUpdate = {};
+        const LOCATION_UPDATE_THROTTLE = 5000; // Only update every 5 seconds
+        
+        function loadDriverLocations() {
+            console.log('Starting driver location tracking...');
+            
+            // Listen for active driver locations with throttling
+            db.collection('driver_locations')
+                .where('isActive', '==', true)
+                .where('lastUpdate', '>', new Date(Date.now() - 30 * 60 * 1000)) // Only show drivers active in last 30 min
+                .onSnapshot((snapshot) => {
+                    snapshot.forEach((doc) => {
+                        const driverId = doc.id;
+                        const locationData = doc.data();
+                        
+                        // Throttle updates per driver
+                        const now = Date.now();
+                        if (lastLocationUpdate[driverId] && (now - lastLocationUpdate[driverId]) < LOCATION_UPDATE_THROTTLE) {
+                            return;
+                        }
+                        lastLocationUpdate[driverId] = now;
+                        
+                        updateDriverMarker(driverId, locationData);
+                    });
+                }, (error) => {
+                    console.error('Error loading driver locations:', error);
+                });
+        }
+        
+        function updateDriverMarker(driverId, locationData) {
+            // Remove old marker if exists
+            if (driverMarkers[driverId]) {
+                driverMarkers[driverId].remove();
+            }
+            
+            // Create truck icon element
+            const el = document.createElement('div');
+            el.className = 'driver-marker';
+            el.innerHTML = `
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="#3B82F6" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); transform: rotate(${locationData.heading || 0}deg);">
+                    <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+                </svg>
+            `;
+            
+            // Create popup with driver details
+            const popup = new maplibregl.Popup({ offset: 25 })
+                .setHTML(`
+                    <div style="min-width: 200px;">
+                        <strong>Driver: ${locationData.driverName || 'Unknown'}</strong><br/>
+                        <strong>Truck:</strong> ${locationData.truckId || 'Not Assigned'}<br/>
+                        <strong>Status:</strong> ${locationData.status || 'Active'}<br/>
+                        <strong>Speed:</strong> ${locationData.speed ? locationData.speed.toFixed(1) + ' km/h' : 'N/A'}<br/>
+                        <strong>Last Update:</strong> ${locationData.lastUpdate ? new Date(locationData.lastUpdate.seconds * 1000).toLocaleTimeString() : 'Unknown'}<br/>
+                        ${locationData.scheduleDetails ? `
+                            <hr style="margin: 8px 0; border: none; border-top: 1px solid #e5e7eb;">
+                            <strong>Route:</strong> ${locationData.scheduleDetails.streets ? locationData.scheduleDetails.streets.slice(0, 3).join(', ') : 'N/A'}<br/>
+                            <strong>Time:</strong> ${locationData.scheduleDetails.startTime} - ${locationData.scheduleDetails.endTime}
+                        ` : ''}
+                    </div>
+                `);
+            
+            const marker = new maplibregl.Marker(el)
+                .setLngLat([locationData.longitude, locationData.latitude])
+                .setPopup(popup)
+                .addTo(map);
+            
+            driverMarkers[driverId] = marker;
         }
 
         function addTruckMarkers() {
@@ -1095,24 +1143,39 @@
                 });
         }
 
-        async function cleanupExpiredAnnouncements() {
+        async function archiveExpiredAnnouncements() {
             try {
                 const now = firebase.firestore.Timestamp.now();
                 const expiredSnapshot = await db.collection('announcements')
                     .where('expiresAt', '<=', now)
+                    .where('isActive', '==', true)
                     .get();
 
                 const batch = db.batch();
-                expiredSnapshot.docs.forEach(doc => {
-                    batch.delete(doc.ref);
-                });
+                const archiveBatch = db.batch();
+                
+                for (const doc of expiredSnapshot.docs) {
+                    const data = doc.data();
+                    // Archive the announcement
+                    await db.collection('archived_announcements').add({
+                        ...data,
+                        archivedAt: now,
+                        originalId: doc.id
+                    });
+                    
+                    // Update the original to mark as archived
+                    batch.update(doc.ref, {
+                        isActive: false,
+                        archivedAt: now
+                    });
+                }
 
                 if (!expiredSnapshot.empty) {
                     await batch.commit();
-                    console.log(`Deleted ${expiredSnapshot.size} expired announcements`);
+                    console.log(`Archived ${expiredSnapshot.size} expired announcements`);
                 }
             } catch (error) {
-                console.error('Error cleaning up expired announcements:', error);
+                console.error('Error archiving expired announcements:', error);
             }
         }
 
@@ -1120,6 +1183,84 @@
             document.getElementById('announcementSection').style.display = 'block';
             document.getElementById('editAnnouncementSection').style.display = 'none';
             currentEditingId = null;
+        }
+
+        function viewArchivedAnnouncements() {
+            // Create modal for archived announcements
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+            `;
+            
+            modal.innerHTML = `
+                <div style="background: white; border-radius: 12px; padding: 24px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0; font-size: 20px; font-weight: 600;">Archived Announcements</h3>
+                        <button onclick="this.closest('div[style*='position: fixed']').remove()" style="background: none; border: none; cursor: pointer; padding: 4px;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="archivedAnnouncementsList" style="min-height: 200px;">
+                        <div style="text-align: center; padding: 20px; color: #6b7280;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin: 0 auto; animation: spin 1s linear infinite;">
+                                <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                            </svg>
+                            <p style="margin-top: 8px;">Loading archived announcements...</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Load archived announcements
+            db.collection('archived_announcements')
+                .orderBy('archivedAt', 'desc')
+                .limit(20)
+                .get()
+                .then((snapshot) => {
+                    const listContainer = document.getElementById('archivedAnnouncementsList');
+                    
+                    if (snapshot.empty) {
+                        listContainer.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 20px;">No archived announcements.</p>';
+                        return;
+                    }
+                    
+                    let html = '';
+                    snapshot.forEach((doc) => {
+                        const data = doc.data();
+                        const createdAt = data.createdAt.toDate();
+                        const archivedAt = data.archivedAt.toDate();
+                        
+                        html += `
+                            <div style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 12px; background: #f9fafb;">
+                                <p style="margin: 0 0 8px 0; color: #374151;">${data.message}</p>
+                                <small style="color: #6b7280; font-size: 12px;">
+                                    Created: ${createdAt.toLocaleString()} | Archived: ${archivedAt.toLocaleString()}
+                                </small>
+                            </div>
+                        `;
+                    });
+                    
+                    listContainer.innerHTML = html;
+                })
+                .catch((error) => {
+                    console.error('Error loading archived announcements:', error);
+                    document.getElementById('archivedAnnouncementsList').innerHTML = 
+                        '<p style="text-align: center; color: #dc2626; padding: 20px;">Error loading archived announcements.</p>';
+                });
         }
 
         let currentEditingId = null;
@@ -1166,20 +1307,102 @@
             );
         }
 
+        // Load recent reports from Firebase
+        function loadRecentReports() {
+            console.log('Loading recent reports from Firebase...');
+            
+            db.collection('reports')
+                .orderBy('createdAt', 'desc')
+                .limit(5)
+                .onSnapshot((snapshot) => {
+                    const reportsList = document.getElementById('recentReportsList');
+                    
+                    if (snapshot.empty) {
+                        reportsList.innerHTML = `
+                            <div style="text-align: center; padding: 20px; color: #6b7280;">
+                                <p>No reports yet.</p>
+                            </div>
+                        `;
+                        document.getElementById('totalReportsCount').textContent = '0';
+                        document.getElementById('criticalIssuesCount').textContent = '0';
+                        return;
+                    }
+                    
+                    let html = '';
+                    let totalReports = 0;
+                    let criticalCount = 0;
+                    
+                    // Get total count and critical issues
+                    db.collection('reports').get().then((allSnapshot) => {
+                        totalReports = allSnapshot.size;
+                        document.getElementById('totalReportsCount').textContent = totalReports;
+                        
+                        // Count critical issues (high priority pending reports)
+                        allSnapshot.forEach((doc) => {
+                            const report = doc.data();
+                            if (report.status === 'pending' && report.priority === 'high') {
+                                criticalCount++;
+                            }
+                        });
+                        document.getElementById('criticalIssuesCount').textContent = criticalCount;
+                    });
+                    
+                    snapshot.forEach((doc) => {
+                        const report = doc.data();
+                        const createdAt = report.createdAt ? report.createdAt.toDate() : new Date();
+                        
+                        // Determine status pill color
+                        let pillClass = 'pill-pending';
+                        if (report.status === 'resolved') {
+                            pillClass = 'pill-success';
+                        } else if (report.status === 'unresolved') {
+                            pillClass = 'pill-danger';
+                        }
+                        
+                        html += `
+                            <div class="report-row">
+                                <div class="report-main">
+                                    <div class="report-title">${report.title || 'Untitled Report'}</div>
+                                    <div class="report-sub">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                            <circle cx="12" cy="10" r="3"></circle>
+                                        </svg>
+                                        <span>${report.location || 'Unknown Location'}</span>
+                                    </div>
+                                    <div class="report-date">${createdAt.toLocaleDateString()}</div>
+                                </div>
+                                <span class="pill ${pillClass}">${report.status ? report.status.charAt(0).toUpperCase() + report.status.slice(1) : 'Pending'}</span>
+                            </div>
+                        `;
+                    });
+                    
+                    reportsList.innerHTML = html;
+                }, (error) => {
+                    console.error('Error loading reports:', error);
+                    document.getElementById('recentReportsList').innerHTML = `
+                        <div style="text-align: center; padding: 20px; color: #dc2626;">
+                            <p>Error loading reports</p>
+                        </div>
+                    `;
+                });
+        }
+
         // Initialize map when page loads
         document.addEventListener('DOMContentLoaded', function() {
             initMap();
             loadUserCounts(); // Load user role counts
             loadAllAnnouncements(); // Load all announcements
+            loadRecentReports(); // Load recent reports from Firebase
             
             // Setup toggle button event listener
             document.getElementById('toggleUserView').addEventListener('click', toggleUserBreakdown);
             
-            // Cleanup expired announcements on load
-            cleanupExpiredAnnouncements();
+            // Archive expired announcements on load
+            archiveExpiredAnnouncements();
             
-            // Set up periodic cleanup every hour
-            setInterval(cleanupExpiredAnnouncements, 60 * 60 * 1000);
+            // Set up periodic archiving every hour
+            setInterval(archiveExpiredAnnouncements, 60 * 60 * 1000);
         });
     </script>
 </body>
