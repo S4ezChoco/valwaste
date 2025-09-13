@@ -52,9 +52,6 @@
                     </button>
                 </form>
 
-                <div class="auth-switch">
-                    <p>Don't have an account? <a href="register.php">Register here</a></p>
-                </div>
             </div>
         </div>
 

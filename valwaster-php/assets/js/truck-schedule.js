@@ -41,6 +41,7 @@ const MAPTILER_KEY = 'Kr1k642bLPyqdCL0A5yM';
 document.addEventListener('DOMContentLoaded', function() {
     generateCalendar();
     updateMonthYearDisplay();
+    loadTrucks();
     loadDrivers();
     loadWasteCollectors();
     loadSchedules();
@@ -69,6 +70,54 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Load trucks from Firebase
+function loadTrucks() {
+    db.collection('trucks').onSnapshot((snapshot) => {
+        const truckSelect = document.getElementById('truck-select');
+        // Keep the default option
+        truckSelect.innerHTML = '<option value="" disabled selected>Truck</option>';
+        
+        if (snapshot.empty) {
+            const noTrucksOption = document.createElement('option');
+            noTrucksOption.disabled = true;
+            noTrucksOption.textContent = 'No trucks available';
+            truckSelect.appendChild(noTrucksOption);
+            return;
+        }
+        
+        // Get all trucks and filter/sort in JavaScript
+        const trucks = [];
+        snapshot.forEach((doc) => {
+            const truckData = doc.data();
+            if (truckData.status === 'available') {
+                trucks.push(truckData);
+            }
+        });
+        
+        // Sort trucks by name
+        trucks.sort((a, b) => a.name.localeCompare(b.name));
+        
+        if (trucks.length === 0) {
+            const noTrucksOption = document.createElement('option');
+            noTrucksOption.disabled = true;
+            noTrucksOption.textContent = 'No available trucks';
+            truckSelect.appendChild(noTrucksOption);
+            return;
+        }
+        
+        // Add trucks to dropdown
+        trucks.forEach((truckData) => {
+            const option = document.createElement('option');
+            option.value = truckData.name;
+            option.textContent = `${truckData.name} (${truckData.licensePlate})`;
+            truckSelect.appendChild(option);
+        });
+    }, (error) => {
+        console.error('Error loading trucks:', error);
+        showError('Error loading trucks. Please refresh the page.');
+    });
+}
 
 // Load drivers from Firebase
 function loadDrivers() {
@@ -487,8 +536,8 @@ function initLocationMap() {
         console.log('Container found, initializing...');
         
         try {
-            // Valenzuela City center coordinates
-            const center = [120.97, 14.72]; // Note: MapLibre uses [lng, lat]
+            // Valenzuela City center coordinates (using Poblacion as center)
+            const center = [120.9455, 14.7077]; // Note: MapLibre uses [lng, lat]
             
             // Philippines bounds [southwest, northeast]
             const philippinesBounds = [
@@ -509,7 +558,27 @@ function initLocationMap() {
             
             scheduleMap = new maplibregl.Map({
                 container: container,
-                style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`,
+                style: {
+                    "version": 8,
+                    "sources": {
+                        "google-street": {
+                            "type": "raster",
+                            "tiles": [
+                                "https://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}"
+                            ],
+                            "tileSize": 256
+                        }
+                    },
+                    "layers": [
+                        {
+                            "id": "google-street-layer",
+                            "type": "raster",
+                            "source": "google-street",
+                            "minzoom": 0,
+                            "maxzoom": 22
+                        }
+                    ]
+                },
                 center: center,
                 zoom: 12,
                 minZoom: 5,
@@ -544,7 +613,7 @@ function initLocationMap() {
                     if (scheduleMap) {
                         scheduleMap.resize();
                         scheduleMap.jumpTo({
-                            center: [120.97, 14.72], // Valenzuela center
+                            center: [120.9455, 14.7077], // Valenzuela center (Poblacion)
                             zoom: 12
                         });
                     }
@@ -608,162 +677,81 @@ function searchStreets() {
 }
 
 function getAllValenzuelaStreets() {
-    return {
-        'District 1': {
-            'Arkong Bato': {
-                coordinates: [120.9650, 14.7350],
-                streets: ['M.H. del Pilar Street']
-            },
-            'Balangkas': {
-                coordinates: [120.9720, 14.7280],
-                streets: ['P. Deato Street', 'Sampaguita Street']
-            },
-            'Bignay': {
-                coordinates: [120.9580, 14.7420],
-                streets: ['Bignay-Llano Road', 'Hulo Street']
-            },
-            'Bisig': {
-                coordinates: [120.9680, 14.7380],
-                streets: ['Bisig Road']
-            },
-            'Canumay East': {
-                coordinates: [120.9750, 14.7200],
-                streets: ['NLEx East Service Road']
-            },
-            'Canumay West': {
-                coordinates: [120.9700, 14.7220],
-                streets: ['J. Gregorio Street']
-            },
-            'Coloong': {
-                coordinates: [120.9620, 14.7300],
-                streets: ['Coloong 1 Road', 'Coloong 2 Road', 'Cabeza C. Porciuncula Street']
-            },
-            'Dalandanan': {
-                coordinates: [120.9550, 14.7450],
-                streets: ['Dalandanan-Veinte Reales Road', 'G. Lazaro Road']
-            },
-            'Isla': {
-                coordinates: [120.9600, 14.7400],
-                streets: ['Isla Road']
-            },
-            'Lawang Bato': {
-                coordinates: [120.9780, 14.7150],
-                streets: ['Lawang Bato Road', 'NLEx East Service Road']
-            },
-            'Lingunan': {
-                coordinates: [120.9640, 14.7320],
-                streets: ['T. Santiago Street', 'Maxima Steel Road']
-            },
-            'Mabolo': {
-                coordinates: [120.9660, 14.7340],
-                streets: ['M.H. del Pilar Street']
-            },
-            'Malanday': {
-                coordinates: [120.9700, 14.7250],
-                streets: ['MacArthur Highway', 'M.H. del Pilar Street']
-            },
-            'Malinta': {
-                coordinates: [120.9720, 14.7180],
-                streets: ['Maysan Road', 'MacArthur Highway']
-            },
-            'Palasan': {
-                coordinates: [120.9680, 14.7360],
-                streets: ['M.H. del Pilar Street']
-            },
-            'Pariancillo Villa': {
-                coordinates: [120.9750, 14.7100],
-                streets: ['Gen. Velilla Street', 'Dr. Pio Valenzuela Street']
-            },
-            'Pasolo': {
-                coordinates: [120.9670, 14.7330],
-                streets: ['Pasolo Road', 'M.H. del Pilar Street']
-            },
-            'Poblacion': {
-                coordinates: [120.9700, 14.7200],
-                streets: ['Polo Road', 'M.H. del Pilar Street']
-            },
-            'Polo': {
-                coordinates: [120.9710, 14.7190],
-                streets: ['Polo Road', 'M.H. del Pilar Street']
-            },
-            'Punturin': {
-                coordinates: [120.9800, 14.7050],
-                streets: ['Punturin Road', 'NLEx Service Road']
-            },
-            'Rincon': {
-                coordinates: [120.9650, 14.7350],
-                streets: ['Rincon-Pasolo-Mabolo Road']
-            },
-            'Tagalag': {
-                coordinates: [120.9590, 14.7410],
-                streets: ['Tagalag Road']
-            },
-            'Veinte Reales': {
-                coordinates: [120.9520, 14.7480],
-                streets: ['Veinte Reales Road']
-            },
-            'Wawang Pulo': {
-                coordinates: [120.9580, 14.7430],
-                streets: ['Tullahan River Area Streets']
-            }
-        },
-        'District 2': {
-            'Bagbaguin': {
-                coordinates: [120.9850, 14.6950],
-                streets: ['ITC Compound Streets']
-            },
-            'Gen. T. de Leon': {
-                coordinates: [120.9820, 14.7000],
-                streets: ['Gen. T. de Leon Street']
-            },
-            'Karuhatan': {
-                coordinates: [120.9800, 14.7020],
-                streets: ['MacArthur Highway', 'A. Pablo Street']
-            },
-            'Mapulang Lupa': {
-                coordinates: [120.9780, 14.7080],
-                streets: ['Industrial Area Streets']
-            },
-            'Marulas': {
-                coordinates: [120.9750, 14.7120],
-                streets: ['MacArthur Highway', 'Pio Valenzuela Street']
-            },
-            'Maysan': {
-                coordinates: [120.9730, 14.7160],
-                streets: ['Maysan Road', 'C. Cabral Street']
-            },
-            'Parada': {
-                coordinates: [120.9760, 14.7100],
-                streets: ['Residential Streets']
-            },
-            'Paso de Blas': {
-                coordinates: [120.9810, 14.6980],
-                streets: ['NLEx Service Road']
-            },
-            'Ugong': {
-                coordinates: [120.9840, 14.6920],
-                streets: ['Mindanao Avenue Extension']
-            }
-        }
-    };
+    // Barangays with coordinates from user's data
+    const barangaysWithCoords = [
+        { name: "Bagbaguin", lat: 14.7161552, lng: 120.9964147 },
+        { name: "Balangkas", lat: 14.7138, lng: 120.9403 },
+        { name: "Bignay", lat: 14.7456, lng: 120.9962 },
+        { name: "Bisig", lat: 14.7166705, lng: 120.9370332 },
+        { name: "Canumay East", lat: 14.7165, lng: 120.9919 },
+        { name: "Canumay West", lat: 14.7133062, lng: 120.9750933 },
+        { name: "Coloong", lat: 14.7259, lng: 120.946 },
+        { name: "Dalandanan", lat: 14.7026, lng: 120.9633 },
+        { name: "Gen. T. de Leon", lat: 14.6864941, lng: 120.9924079 },
+        { name: "Isla", lat: 14.7035, lng: 120.9525 },
+        { name: "Karuhatan", lat: 14.6869, lng: 120.9733 },
+        { name: "Lawang Bato", lat: 14.7265258, lng: 120.9841003 },
+        { name: "Pasolo", lat: 14.708, lng: 120.9526 },
+        { name: "Poblacion", lat: 14.7081343, lng: 120.9412695 },
+        { name: "Punturin", lat: 14.7353, lng: 120.9962 },
+        { name: "Rincon", lat: 14.699, lng: 120.9581 },
+        { name: "Tagalag", lat: 14.7271, lng: 120.9374 },
+        { name: "Ugong", lat: 14.6965, lng: 121.0134 },
+        { name: "Veinte Reales", lat: 14.7147, lng: 120.969 },
+        { name: "Wawang Pulo", lat: 14.7336, lng: 120.9288 }
+    ];
+    
+    // Additional barangays with specific coordinates
+    const extraBarangaysWithCoords = [
+        { name: "Arkong Bato", lat: 14.698169, lng: 120.9460715 },
+        { name: "Lingunan", lat: 14.7156733, lng: 120.9673923 },
+        { name: "Mabolo", lat: 14.7118669, lng: 120.9462916 },
+        { name: "Malanday", lat: 14.7214241, lng: 120.937715 },
+        { name: "Malinta", lat: 14.6881948, lng: 120.9547038 },
+        { name: "Mapulang Lupa", lat: 14.7025595, lng: 120.9980711 },
+        { name: "Marulas", lat: 14.6760978, lng: 120.9452279 },
+        { name: "Maysan", lat: 14.6986493, lng: 120.9667263 },
+        { name: "Palasan", lat: 14.7029132, lng: 120.9376807 },
+        { name: "Parada", lat: 14.6960116, lng: 120.9781539 },
+        { name: "Paso de Blas", lat: 14.7049578, lng: 120.9823692 },
+        { name: "Polo", lat: 14.7100422, lng: 120.9398335 },
+        { name: "Pariancillo Villa", lat: 14.708006, lng: 120.9415701 }
+    ];
+    
+    const result = {};
+    
+    // Add barangays with coordinates
+    barangaysWithCoords.forEach(barangay => {
+        result[barangay.name] = {
+            coordinates: [barangay.lng, barangay.lat],
+            streets: [barangay.name + " Area"] // Just use barangay name as area
+        };
+    });
+    
+    // Add extra barangays with specific coordinates
+    extraBarangaysWithCoords.forEach(barangay => {
+        result[barangay.name] = {
+            coordinates: [barangay.lng, barangay.lat],
+            streets: [barangay.name + " Area"]
+        };
+    });
+    
+    return result;
 }
 
 function getStreetsArray() {
     const streetsData = getAllValenzuelaStreets();
     const allStreets = [];
     
-    // Flatten the structure to get all streets with coordinates
-    Object.keys(streetsData).forEach(district => {
-        Object.keys(streetsData[district]).forEach(barangay => {
-            const barangayData = streetsData[district][barangay];
-            barangayData.streets.forEach(street => {
-                allStreets.push({
-                    display: `${street} (${barangay}, ${district})`,
-                    street: street,
-                    barangay: barangay,
-                    district: district,
-                    coordinates: barangayData.coordinates
-                });
+    // Flatten the structure to get all barangays with coordinates
+    Object.keys(streetsData).forEach(barangayName => {
+        const barangayData = streetsData[barangayName];
+        barangayData.streets.forEach(street => {
+            allStreets.push({
+                display: `${barangayName} Area`,
+                street: street,
+                barangay: barangayName,
+                coordinates: barangayData.coordinates
             });
         });
     });
@@ -772,30 +760,35 @@ function getStreetsArray() {
 }
 
 function loadNearbyStreets(lat, lng) {
-    // Determine which district/barangay based on coordinates
+    // Get all streets and find the nearest ones based on coordinates
+    const allStreets = getStreetsArray();
     let nearbyStreets = [];
     
-    // Simple location-based logic for Valenzuela
-    if (lat > 14.73) {
-        // Northern area - likely District 1
-        nearbyStreets = [
-            'MacArthur Highway (Malanday, District 1)',
-            'M.H. del Pilar Street (Malanday, District 1)',
-            'Maysan Road (Malinta, District 1)',
-            'Polo Road (Poblacion, District 1)',
-            'Isla Road (Isla, District 1)',
-            'Punturin Road (Punturin, District 1)'
-        ];
+    // Calculate distance from clicked point to each barangay
+    const calculateDistance = (lat1, lng1, lat2, lng2) => {
+        const R = 6371; // Earth's radius in km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    };
+    
+    // Find streets within 3km radius, sorted by distance
+    const streetsWithDistance = allStreets.map(street => {
+        const distance = calculateDistance(lat, lng, street.coordinates[1], street.coordinates[0]);
+        return { ...street, distance };
+    }).filter(street => street.distance <= 3) // Within 3km
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 15); // Show max 15 nearest streets
+    
+    // If no streets found within 3km, show all streets
+    if (streetsWithDistance.length === 0) {
+        nearbyStreets = allStreets.slice(0, 10); // Show first 10 streets
     } else {
-        // Southern area - likely District 2
-        nearbyStreets = [
-            'MacArthur Highway (Karuhatan, District 2)',
-            'Gen. T. de Leon Street (Gen. T. de Leon, District 2)',
-            'A. Pablo Street (Karuhatan, District 2)',
-            'Maysan Road (Maysan, District 2)',
-            'NLEx Service Road (Paso de Blas, District 2)',
-            'Mindanao Avenue Extension (Ugong, District 2)'
-        ];
+        nearbyStreets = streetsWithDistance;
     }
     
     displayStreetsChecklist(nearbyStreets);

@@ -73,6 +73,17 @@
         .role-text strong {
             color: #374151;
         }
+        
+        /* Traffic toggle button styling */
+        #toggleTraffic.active {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3B82F6;
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+        
+        #toggleTraffic.active svg {
+            stroke: #3B82F6;
+        }
     </style>
 </head>
 <body>
@@ -310,22 +321,48 @@
                     </aside>
                 </section>
 
-                <!-- Latest Announcement -->
+                <!-- Announcements -->
                 <section class="card annc-card">
-                    <h4 class="annc-title">Latest Announcement</h4>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h4 class="annc-title">Announcements</h4>
+                        <button type="button" class="btn-outline" onclick="editAnnouncement()">
+                            Create Announcement
+                        </button>
+                    </div>
+                    
                     <div id="announcementSection">
-                        <p class="annc-body" id="announcementText">No announcement yet.</p>
-                        <div class="annc-actions">
-                            <button type="button" class="btn-outline" onclick="editAnnouncement()">
-                                Edit Announcement
-                            </button>
+                        <div id="announcementsList">
+                            <!-- Announcements will be loaded here -->
                         </div>
                     </div>
                     
                     <div id="editAnnouncementSection" style="display: none;">
-                        <textarea class="annc-textarea" id="announcementTextarea" placeholder="Type your announcement..."></textarea>
+                        <textarea class="annc-textarea" id="announcementTextarea" placeholder="Type your announcement..." maxlength="500"></textarea>
+                        <div style="text-align: right; margin: 4px 0; color: #6b7280; font-size: 12px;">
+                            <span id="charCount">0</span>/500 characters
+                        </div>
+                        <div style="margin: 12px 0;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #374151; font-size: 14px;">
+                                Auto-delete after:
+                            </label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="number" id="announcementDuration" 
+                                       value="24" min="1" max="24" 
+                                       style="width: 80px; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                                <span style="color: #6b7280; font-size: 14px;">hours</span>
+                                <small style="color: #6b7280; font-size: 12px; margin-left: 8px;">
+                                    (Max: 24 hours)
+                                </small>
+                            </div>
+                        </div>
                         <div class="annc-actions">
-                            <button type="button" class="btn-primary" onclick="saveAnnouncement()">Save</button>
+                            <button type="button" class="btn-primary" onclick="sendAnnouncement()" id="sendAnnouncementBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22,2 15,22 11,13 2,9"></polygon>
+                                </svg>
+                                Send
+                            </button>
                             <button type="button" class="btn-ghost" onclick="cancelAnnouncement()">Cancel</button>
                         </div>
                     </div>
@@ -389,6 +426,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     
     <script type="module" src="assets/js/auth.js"></script>
+    <script src="assets/js/notifications.js"></script>
     <script>
         // Firebase configuration
         const firebaseConfig = {
@@ -491,7 +529,13 @@
                 maxBounds: philippinesBounds,
                 pitch: 0,
                 bearing: 0,
-                antialias: true
+                antialias: true,
+                attributionControl: false
+            });
+            
+            // Remove duplicate labels when style loads
+            map.on('style.load', () => {
+                hideDuplicateLabels();
             });
 
             // Add navigation control
@@ -509,6 +553,9 @@
 
                 // Setup 3D buildings layer (initially hidden)
                 setupBuildingsLayer();
+                
+                // Setup traffic layer (initially hidden)
+                setupTrafficLayer();
             });
 
             // Setup control event listeners
@@ -678,6 +725,67 @@
                 }
             }
         }
+        
+        function hideDuplicateLabels() {
+            try {
+                const style = map.getStyle();
+                if (!style || !style.layers) return;
+                
+                // Hide duplicate text/symbol layers while keeping roads and 3D features
+                style.layers.forEach((layer, index) => {
+                    if (layer.type === 'symbol' && 
+                        (layer.layout && layer.layout['text-field']) &&
+                        (layer.id.includes('place') || 
+                         layer.id.includes('poi') || 
+                         layer.id.includes('label') ||
+                         layer.id.includes('text'))) {
+                        
+                        // Only hide secondary label layers, keep primary ones
+                        if (index > 10) { // Keep first few essential label layers
+                            map.setLayoutProperty(layer.id, 'visibility', 'none');
+                        }
+                    }
+                });
+                
+                console.log('Duplicate labels hidden');
+            } catch (error) {
+                console.warn('Could not hide duplicate labels:', error);
+            }
+        }
+        
+        function setupTrafficLayer() {
+            // WARNING: This uses unofficial Google Maps tiles which may violate ToS
+            // For production, use official APIs like HERE, TomTom, or Mapbox Traffic
+            try {
+                if (!map.getSource('google-traffic')) {
+                    map.addSource('google-traffic', {
+                        'type': 'raster',
+                        'tiles': [
+                            'https://mt0.google.com/vt/lyrs=h@159000000,traffic|seconds_into_week:-1&hl=en&gl=ph&x={x}&y={y}&z={z}'
+                        ],
+                        'tileSize': 256,
+                        'attribution': 'Unofficial Google Maps data'
+                    });
+                }
+                
+                map.addLayer({
+                    'id': 'google-traffic-layer',
+                    'type': 'raster',
+                    'source': 'google-traffic',
+                    'layout': {
+                        'visibility': 'visible'
+                    },
+                    'paint': {
+                        'raster-opacity': 0.8
+                    }
+                });
+                
+                console.log('Traffic layer setup (unofficial)');
+                
+            } catch (error) {
+                console.warn('Could not setup traffic layer:', error);
+            }
+        }
 
         function setupMapControls() {
             // 3D Toggle
@@ -773,9 +881,10 @@
                     btn.classList.remove('active');
                 }
                 
-                // Re-add markers and buildings after style change
+                // Re-add markers, buildings, and traffic after style change
                 map.once('styledata', () => {
                     loadTruckSchedules();
+                    hideDuplicateLabels(); // Hide duplicate labels on style change
                     if (isBuildingsEnabled) {
                         setupBuildingsLayer();
                         setTimeout(() => {
@@ -784,8 +893,11 @@
                             }
                         }, 100);
                     }
+                    // Always show traffic after style change
+                    setupTrafficLayer();
                 });
             });
+            
 
             // Fullscreen Toggle
             document.getElementById('toggleFullscreen').addEventListener('click', () => {
@@ -808,31 +920,267 @@
             });
         }
 
+
         function editAnnouncement() {
             document.getElementById('announcementSection').style.display = 'none';
             document.getElementById('editAnnouncementSection').style.display = 'block';
-            document.getElementById('announcementTextarea').value = currentAnnouncement === "No announcement yet." ? "" : currentAnnouncement;
+            document.getElementById('announcementTextarea').value = "";
+            document.getElementById('charCount').textContent = "0";
+            
+            // Add character counter
+            const textarea = document.getElementById('announcementTextarea');
+            textarea.addEventListener('input', function() {
+                document.getElementById('charCount').textContent = this.value.length;
+            });
         }
 
-        function saveAnnouncement() {
-            const newText = document.getElementById('announcementTextarea').value.trim();
-            currentAnnouncement = newText || "No announcement yet.";
-            document.getElementById('announcementText').textContent = currentAnnouncement;
-            cancelAnnouncement();
+        async function sendAnnouncement() {
+            const text = document.getElementById('announcementTextarea').value.trim();
+            const sendBtn = document.getElementById('sendAnnouncementBtn');
+            
+            if (!text) {
+                showError('Please enter an announcement message.');
+                return;
+            }
+
+            // Get and validate duration
+            const durationHours = parseInt(document.getElementById('announcementDuration').value);
+            if (isNaN(durationHours) || durationHours < 1 || durationHours > 24) {
+                showError('Please enter a valid duration between 1 and 24 hours.');
+                return;
+            }
+
+            // Disable button and show loading state
+            sendBtn.disabled = true;
+            const isEditing = currentEditingId !== null;
+            sendBtn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; animation: spin 1s linear infinite;">
+                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                </svg>
+                ${isEditing ? 'Updating...' : 'Sending...'}
+            `;
+
+            try {
+                const now = new Date();
+                
+                if (isEditing) {
+                    // Update existing announcement
+                    const updateData = {
+                        message: text,
+                        updatedAt: firebase.firestore.Timestamp.fromDate(now)
+                    };
+                    
+                    await db.collection('announcements').doc(currentEditingId).update(updateData);
+                    showSuccess('Announcement updated successfully!');
+                } else {
+                    // Create new announcement with custom duration
+                    const expiryDate = new Date(now.getTime() + durationHours * 60 * 60 * 1000);
+                    
+                    const announcementData = {
+                        message: text,
+                        createdAt: firebase.firestore.Timestamp.fromDate(now),
+                        expiresAt: firebase.firestore.Timestamp.fromDate(expiryDate),
+                        createdBy: 'Administrator',
+                        isActive: true
+                    };
+
+                    await db.collection('announcements').add(announcementData);
+                    showSuccess('Announcement sent successfully!');
+                }
+                
+                cancelAnnouncement();
+
+            } catch (error) {
+                console.error('Error with announcement:', error);
+                showError(`Error ${isEditing ? 'updating' : 'sending'} announcement. Please try again.`);
+            } finally {
+                // Reset button
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22,2 15,22 11,13 2,9"></polygon>
+                    </svg>
+                    ${isEditing ? 'Update' : 'Send'}
+                `;
+            }
+        }
+
+        function displayAnnouncementItem(announcement, id) {
+            const createdAt = announcement.createdAt instanceof Date ? announcement.createdAt : announcement.createdAt.toDate();
+            const expiresAt = announcement.expiresAt instanceof Date ? announcement.expiresAt : announcement.expiresAt.toDate();
+            
+            return `
+                <div class="announcement-item" style="margin-bottom: 12px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f9fafb; position: relative;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                        <div style="flex: 1;">
+                            <p class="annc-body" style="margin: 0 0 8px 0;">${announcement.message}</p>
+                            <div class="annc-meta">
+                                <small style="color: #6b7280; font-size: 12px;">
+                                    Posted: ${createdAt.toLocaleString()} | 
+                                    Expires: ${expiresAt.toLocaleString()}
+                                </small>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 6px; flex-shrink: 0;">
+                            <button onclick="editAnnouncement('${id}', '${announcement.message.replace(/'/g, "\\'")}')"
+                                style="padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 4px; background: white; cursor: pointer; font-size: 12px; color: #374151; transition: all 0.2s;"
+                                onmouseover="this.style.background='#f9fafb'"
+                                onmouseout="this.style.background='white'">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                                Edit
+                            </button>
+                            <button onclick="deleteAnnouncement('${id}')"
+                                style="padding: 4px 8px; border: 1px solid #dc2626; border-radius: 4px; background: white; cursor: pointer; font-size: 12px; color: #dc2626; transition: all 0.2s;"
+                                onmouseover="this.style.background='#fee2e2'"
+                                onmouseout="this.style.background='white'">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3,6 5,6 21,6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                                </svg>
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function loadAllAnnouncements() {
+            console.log('Loading all announcements...');
+            
+            // First try to load all announcements without complex queries
+            db.collection('announcements')
+                .onSnapshot((snapshot) => {
+                    console.log('Raw announcements snapshot:', snapshot.size, 'documents');
+                    const announcementsList = document.getElementById('announcementsList');
+                    
+                    if (snapshot.empty) {
+                        announcementsList.innerHTML = '<p class="annc-body" style="color: #6b7280;">No announcements yet.</p>';
+                        return;
+                    }
+                    
+                    const now = new Date();
+                    let html = '';
+                    let activeCount = 0;
+                    
+                    snapshot.forEach((doc) => {
+                        const announcement = doc.data();
+                        console.log('Processing announcement:', announcement);
+                        
+                        // Check if announcement is still active
+                        const expiresAt = announcement.expiresAt.toDate();
+                        const isActive = announcement.isActive && expiresAt > now;
+                        
+                        if (isActive) {
+                            html += displayAnnouncementItem(announcement, doc.id);
+                            activeCount++;
+                        }
+                    });
+                    
+                    console.log('Active announcements:', activeCount);
+                    
+                    if (activeCount === 0) {
+                        announcementsList.innerHTML = '<p class="annc-body" style="color: #6b7280;">No active announcements.</p>';
+                    } else {
+                        announcementsList.innerHTML = html;
+                    }
+                }, (error) => {
+                    console.error('Error loading announcements:', error);
+                    document.getElementById('announcementsList').innerHTML = '<p class="annc-body" style="color: #dc2626;">Error loading announcements: ' + error.message + '</p>';
+                });
+        }
+
+        async function cleanupExpiredAnnouncements() {
+            try {
+                const now = firebase.firestore.Timestamp.now();
+                const expiredSnapshot = await db.collection('announcements')
+                    .where('expiresAt', '<=', now)
+                    .get();
+
+                const batch = db.batch();
+                expiredSnapshot.docs.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+
+                if (!expiredSnapshot.empty) {
+                    await batch.commit();
+                    console.log(`Deleted ${expiredSnapshot.size} expired announcements`);
+                }
+            } catch (error) {
+                console.error('Error cleaning up expired announcements:', error);
+            }
         }
 
         function cancelAnnouncement() {
             document.getElementById('announcementSection').style.display = 'block';
             document.getElementById('editAnnouncementSection').style.display = 'none';
+            currentEditingId = null;
+        }
+
+        let currentEditingId = null;
+
+        function editAnnouncement(id, message) {
+            if (typeof id === 'undefined') {
+                // This is creating a new announcement
+                document.getElementById('announcementSection').style.display = 'none';
+                document.getElementById('editAnnouncementSection').style.display = 'block';
+                document.getElementById('announcementTextarea').value = "";
+                document.getElementById('charCount').textContent = "0";
+                currentEditingId = null;
+            } else {
+                // This is editing an existing announcement
+                document.getElementById('announcementSection').style.display = 'none';
+                document.getElementById('editAnnouncementSection').style.display = 'block';
+                document.getElementById('announcementTextarea').value = message;
+                document.getElementById('charCount').textContent = message.length;
+                currentEditingId = id;
+            }
+            
+            // Add character counter
+            const textarea = document.getElementById('announcementTextarea');
+            textarea.removeEventListener('input', updateCharCount); // Remove existing listener
+            textarea.addEventListener('input', updateCharCount);
+        }
+
+        function updateCharCount() {
+            document.getElementById('charCount').textContent = this.value.length;
+        }
+
+        async function deleteAnnouncement(id) {
+            showConfirm(
+                'Are you sure you want to delete this announcement? This action cannot be undone.',
+                async () => {
+                    try {
+                        await db.collection('announcements').doc(id).delete();
+                        showSuccess('Announcement deleted successfully!');
+                    } catch (error) {
+                        console.error('Error deleting announcement:', error);
+                        showError('Error deleting announcement. Please try again.');
+                    }
+                }
+            );
         }
 
         // Initialize map when page loads
         document.addEventListener('DOMContentLoaded', function() {
             initMap();
             loadUserCounts(); // Load user role counts
+            loadAllAnnouncements(); // Load all announcements
             
             // Setup toggle button event listener
             document.getElementById('toggleUserView').addEventListener('click', toggleUserBreakdown);
+            
+            // Cleanup expired announcements on load
+            cleanupExpiredAnnouncements();
+            
+            // Set up periodic cleanup every hour
+            setInterval(cleanupExpiredAnnouncements, 60 * 60 * 1000);
         });
     </script>
 </body>
