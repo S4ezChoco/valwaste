@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/constants.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/location_service.dart';
 import '../../services/attendance_service.dart';
-import '../schedule/schedule_screen.dart';
+import '../../services/schedule_service.dart';
+import '../../widgets/announcement_banner.dart';
+import '../schedule/driver_schedule_screen.dart';
+import '../attendance/driver_attendance_screen.dart';
 import '../map/map_screen.dart';
-// Removed unused imports for now - will add back when implementing photo features
 
 class DriverDashboardScreen extends StatefulWidget {
   const DriverDashboardScreen({super.key});
@@ -17,7 +18,6 @@ class DriverDashboardScreen extends StatefulWidget {
 }
 
 class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isRouteActive = false;
   Map<String, dynamic>? _todaySchedule;
@@ -25,8 +25,8 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
   List<Map<String, dynamic>> _nextStops = [];
   int _completedStops = 0;
   int _totalStops = 0;
-  bool _isCheckingIn = false;
-  bool _isCheckingOut = false;
+  final bool _isCheckingIn = false;
+  final bool _isCheckingOut = false;
 
   @override
   void initState() {
@@ -41,25 +41,15 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
   }
 
   Future<void> _loadTodaySchedule() async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
-    final driverName = userDoc.data()?['name'] ?? '';
-
-    final today = DateTime.now();
-    final todayString = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-
-    final scheduleQuery = await _firestore
-        .collection('truck_schedule')
-        .where('date', isEqualTo: todayString)
-        .where('driver', isEqualTo: driverName)
-        .get();
-
-    if (scheduleQuery.docs.isNotEmpty && mounted) {
-      setState(() {
-        _todaySchedule = scheduleQuery.docs.first.data();
-      });
+    try {
+      final schedule = await ScheduleService.getTodaySchedule();
+      if (schedule != null && mounted) {
+        setState(() {
+          _todaySchedule = schedule;
+        });
+      }
+    } catch (e) {
+      print('Error loading today schedule: $e');
     }
   }
 
@@ -131,94 +121,6 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
     });
   }
 
-  Future<void> _checkIn() async {
-    setState(() {
-      _isCheckingIn = true;
-    });
-
-    try {
-      // Get team members from schedule
-      final wasteCollectors = _todaySchedule?['wasteCollectors'] as List<dynamic>? ?? [];
-      final teamMembers = wasteCollectors.map((collector) => {
-        'name': collector.toString(),
-        'role': 'Waste Collector',
-      }).toList();
-
-      // Check in
-      await AttendanceService.checkIn(
-        location: 'Valenzuela City',
-        notes: 'Started shift',
-        teamMembers: teamMembers.cast<Map<String, String>>(),
-      );
-
-      await _loadTodayAttendance();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Checked in successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Check-in failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() {
-        _isCheckingIn = false;
-      });
-    }
-  }
-
-  Future<void> _checkOut() async {
-    setState(() {
-      _isCheckingOut = true;
-    });
-
-    try {
-      if (_todayAttendance != null) {
-        // Get the document ID from the attendance record
-        final activeAttendance = await AttendanceService.getActiveAttendance(_auth.currentUser!.uid);
-        
-        if (activeAttendance != null) {
-          await AttendanceService.checkOut(
-            attendanceId: activeAttendance.id,
-            notes: 'Ended shift',
-          );
-
-          await _loadTodayAttendance();
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Checked out successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No active attendance record found'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Check-out failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() {
-        _isCheckingOut = false;
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -237,6 +139,9 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Announcement Banner at the top
+                const AnnouncementBanner(),
+                
                 // Welcome Header
                 Row(
                   children: [
@@ -460,12 +365,23 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
                       subtitle: 'See today\'s route',
                       color: AppColors.primary,
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const MapScreen(),
-                          ),
-                        );
+                        if (_todaySchedule != null) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MapScreen(
+                                schedule: _todaySchedule,
+                              ),
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('No schedule for today'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                        }
                       },
                     ),
                     if (_todayAttendance != null && _todayAttendance!['checkOut'] == null)
@@ -475,7 +391,14 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
                         subtitle: 'End your shift',
                         color: Colors.red,
                         isLoading: _isCheckingOut,
-                        onTap: _isCheckingOut ? null : _checkOut,
+                        onTap: _isCheckingOut ? null : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const DriverAttendanceScreen(),
+                            ),
+                          ).then((_) => _loadData());
+                        },
                       )
                     else if (_todayAttendance == null)
                       _ActionCard(
@@ -484,7 +407,14 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
                         subtitle: 'Start your shift',
                         color: Colors.green,
                         isLoading: _isCheckingIn,
-                        onTap: _isCheckingIn ? null : _checkIn,
+                        onTap: _isCheckingIn ? null : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const DriverAttendanceScreen(),
+                            ),
+                          ).then((_) => _loadData());
+                        },
                       )
                     else
                       _ActionCard(
@@ -503,7 +433,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const ScheduleScreen(),
+                            builder: (context) => const DriverScheduleScreen(),
                           ),
                         );
                       },
@@ -552,12 +482,14 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
                       subtitle: 'View past routes',
                       color: Colors.purple,
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('History feature coming soon!'),
-                            backgroundColor: Colors.orange,
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const DriverScheduleScreen(),
                           ),
-                        );
+                        ).then((value) {
+                          // Open past tab by default
+                        });
                       },
                     ),
                   ],

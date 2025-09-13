@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
 import '../../services/firebase_auth_service.dart';
+import '../../widgets/announcement_banner.dart';
 import '../collection/collection_request_screen.dart';
 
 class BarangayOfficialDashboardScreen extends StatelessWidget {
@@ -18,6 +19,11 @@ class BarangayOfficialDashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Announcement Banner at the top
+              const AnnouncementBanner(),
+              
+              const SizedBox(height: AppSizes.paddingMedium),
+              
               // Enhanced Welcome Header
               Container(
                 width: double.infinity,

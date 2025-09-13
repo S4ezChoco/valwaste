@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/constants.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/announcement_service.dart';
+import '../../widgets/announcement_banner.dart';
 import '../collection/collection_request_screen.dart';
 import '../guide/recycling_guide_screen.dart';
 import '../reports/resident_reports_screen.dart';
@@ -84,6 +85,9 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Announcement Banner at the top
+              const AnnouncementBanner(),
+                
               // Welcome Header
               Row(
                 children: [
