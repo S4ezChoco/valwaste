@@ -6,6 +6,7 @@ import '../../services/location_tracking_service.dart';
 import '../../models/user.dart';
 import '../schedule/schedule_screen.dart';
 import '../schedule/barangay_schedule_screen.dart';
+import '../schedule/driver_schedule_screen.dart';
 import '../profile/profile_screen.dart';
 import '../collection/collection_request_screen.dart';
 import '../map/map_screen.dart';
@@ -116,8 +117,8 @@ class _HomeScreenState extends State<HomeScreen> {
         // Driver features: Maps, Schedule, Reports, Profile
         _screens = [
           const MapScreen(), // Maps tab is now the home
-          const ScheduleScreen(), // Schedule tab
-          const DriverReportScreen(), // Reports tab
+          const DriverScheduleScreen(), // Schedule tab - shows actual assigned collections
+          const DriverReportScreen(), // Reports tab - shows collection completion reports
           const ProfileScreen(),
         ];
         break;

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import '../../utils/constants.dart';
-import '../../services/firebase_auth_service.dart';
+import '../../services/driver_collection_service.dart';
+import '../../models/waste_collection.dart';
 
 class DriverReportScreen extends StatefulWidget {
   const DriverReportScreen({super.key});
@@ -12,1233 +11,322 @@ class DriverReportScreen extends StatefulWidget {
 }
 
 class _DriverReportScreenState extends State<DriverReportScreen> {
-  String _selectedReportType = 'Reports';
-  DateTime _currentDate = DateTime.now();
-  Map<String, Map<String, dynamic>> _attendanceData =
-      {}; // date -> attendance info
-  List<Map<String, dynamic>> _attendanceList = [];
-  List<Map<String, dynamic>> _shiftHistory = [];
+  List<WasteCollection> _completedCollections = [];
+  Map<String, dynamic> _collectionStats = {};
+  bool _isLoading = true;
+  String _selectedPeriod = 'Today';
+  final List<String> _periodOptions = ['Today', 'This Week', 'This Month'];
 
   @override
   void initState() {
     super.initState();
-    _loadShiftData();
+    _loadCollectionData();
   }
 
-  Future<void> _loadShiftData() async {
-    try {
-      // Load real attendance data from Firebase
-      // TODO: Implement Firebase integration for attendance
-      setState(() {
-        _attendanceList = [];
-        _shiftHistory = [];
-      });
-    } catch (e) {
-      print('Error loading shift data: $e');
-      setState(() {
-        _attendanceList = [];
-        _shiftHistory = [];
-      });
-    }
-  }
-
-  void _clockIn(DateTime date) {
-    _showStartShiftModal(date);
-  }
-
-  void _showStartShiftModal(DateTime date) {
-    final nameController = TextEditingController();
-    final locationController = TextEditingController();
-    String selectedRole = 'Driver';
-    File? selectedImage;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          elevation: 20,
-          child: Container(
-            width: MediaQuery.of(context).size.width * 0.9,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.white, Colors.grey.shade50],
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Header with gradient background
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                    ),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        AppColors.primary,
-                        AppColors.primary.withOpacity(0.8),
-                      ],
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.person_add,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Add Attendance',
-                              style: AppTextStyles.heading3.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              'Start your shift with details',
-                              style: AppTextStyles.caption.copyWith(
-                                color: Colors.white.withOpacity(0.9),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Content
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Name Field
-                        Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.1),
-                                spreadRadius: 1,
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: TextField(
-                            controller: nameController,
-                            decoration: InputDecoration(
-                              labelText: 'Name',
-                              prefixIcon: Container(
-                                margin: const EdgeInsets.all(8),
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  Icons.person,
-                                  color: AppColors.primary,
-                                  size: 20,
-                                ),
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              filled: true,
-                              fillColor: Colors.white,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Location Field
-                        Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.1),
-                                spreadRadius: 1,
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: TextField(
-                            controller: locationController,
-                            decoration: InputDecoration(
-                              labelText: 'Location',
-                              prefixIcon: Container(
-                                margin: const EdgeInsets.all(8),
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  Icons.location_on,
-                                  color: Colors.green,
-                                  size: 20,
-                                ),
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              filled: true,
-                              fillColor: Colors.white,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Role Dropdown
-                        Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.1),
-                                spreadRadius: 1,
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: DropdownButtonFormField<String>(
-                            decoration: InputDecoration(
-                              labelText: 'Role',
-                              prefixIcon: Container(
-                                margin: const EdgeInsets.all(8),
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  Icons.work,
-                                  color: Colors.orange,
-                                  size: 20,
-                                ),
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              filled: true,
-                              fillColor: Colors.white,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                            ),
-                            value: selectedRole,
-                            items:
-                                ['Driver', 'Palero 1', 'Palero 2', 'Palero 3']
-                                    .map(
-                                      (role) => DropdownMenuItem(
-                                        value: role,
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              role == 'Driver'
-                                                  ? Icons.drive_eta
-                                                  : Icons.construction,
-                                              size: 18,
-                                              color: AppColors.primary,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(role),
-                                          ],
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                            onChanged: (value) {
-                              if (value != null) {
-                                selectedRole = value;
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Picture Section
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Colors.purple.withOpacity(0.05),
-                                Colors.blue.withOpacity(0.05),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.purple.withOpacity(0.2),
-                              width: 1,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.purple.withOpacity(0.1),
-                                spreadRadius: 1,
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.purple.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Icon(
-                                      Icons.camera_alt,
-                                      color: Colors.purple,
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    'Picture',
-                                    style: AppTextStyles.body1.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.purple.shade700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Image Preview or Placeholder
-                              if (selectedImage != null)
-                                Container(
-                                  width: 120,
-                                  height: 120,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.1),
-                                        spreadRadius: 2,
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: Image.file(
-                                      selectedImage!,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                )
-                              else
-                                Container(
-                                  width: 120,
-                                  height: 120,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        Colors.grey.shade100,
-                                        Colors.grey.shade200,
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: Colors.grey.shade300,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.camera_alt,
-                                        size: 40,
-                                        color: Colors.grey.shade400,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Add Photo',
-                                        style: AppTextStyles.caption.copyWith(
-                                          color: Colors.grey.shade500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                              const SizedBox(height: 16),
-
-                              // Camera and Gallery Buttons
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(12),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: AppColors.primary
-                                                .withOpacity(0.3),
-                                            spreadRadius: 1,
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: ElevatedButton.icon(
-                                        onPressed: () async {
-                                          final ImagePicker picker =
-                                              ImagePicker();
-                                          final XFile? image = await picker
-                                              .pickImage(
-                                                source: ImageSource.camera,
-                                                maxWidth: 800,
-                                                maxHeight: 800,
-                                                imageQuality: 80,
-                                              );
-                                          if (image != null) {
-                                            setModalState(() {
-                                              selectedImage = File(image.path);
-                                            });
-                                          }
-                                        },
-                                        icon: const Icon(
-                                          Icons.camera_alt,
-                                          size: 18,
-                                        ),
-                                        label: const Text('Camera'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppColors.primary,
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(12),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.green.withOpacity(
-                                              0.3,
-                                            ),
-                                            spreadRadius: 1,
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: ElevatedButton.icon(
-                                        onPressed: () async {
-                                          final ImagePicker picker =
-                                              ImagePicker();
-                                          final XFile? image = await picker
-                                              .pickImage(
-                                                source: ImageSource.gallery,
-                                                maxWidth: 800,
-                                                maxHeight: 800,
-                                                imageQuality: 80,
-                                              );
-                                          if (image != null) {
-                                            setModalState(() {
-                                              selectedImage = File(image.path);
-                                            });
-                                          }
-                                        },
-                                        icon: const Icon(
-                                          Icons.photo_library,
-                                          size: 18,
-                                        ),
-                                        label: const Text('Gallery'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.green,
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Action Buttons
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            borderRadius: const BorderRadius.only(
-                              bottomLeft: Radius.circular(20),
-                              bottomRight: Radius.circular(20),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.grey.withOpacity(0.2),
-                                        spreadRadius: 1,
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 16,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.close,
-                                          color: Colors.grey.shade600,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Cancel',
-                                          style: AppTextStyles.body1.copyWith(
-                                            color: Colors.grey.shade600,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        AppColors.primary,
-                                        AppColors.primary.withOpacity(0.8),
-                                      ],
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppColors.primary.withOpacity(
-                                          0.3,
-                                        ),
-                                        spreadRadius: 1,
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      if (nameController.text.trim().isEmpty) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Please enter a name',
-                                            ),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                        return;
-                                      }
-
-                                      if (locationController.text
-                                          .trim()
-                                          .isEmpty) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Please enter a location',
-                                            ),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                        return;
-                                      }
-
-                                      // Start the shift with the provided information
-                                      _confirmStartShift(
-                                        date,
-                                        nameController.text.trim(),
-                                        locationController.text.trim(),
-                                        selectedRole,
-                                        selectedImage,
-                                      );
-                                      Navigator.pop(context);
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.transparent,
-                                      shadowColor: Colors.transparent,
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 16,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(
-                                          Icons.play_arrow,
-                                          color: Colors.white,
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Start Shift',
-                                          style: AppTextStyles.body1.copyWith(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _confirmStartShift(
-    DateTime date,
-    String name,
-    String location,
-    String role,
-    File? image,
-  ) {
-    final currentUser = FirebaseAuthService.currentUser;
-    final dateKey =
-        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    final now = DateTime.now();
-
+  Future<void> _loadCollectionData() async {
     setState(() {
-      _attendanceData[dateKey] = {
-        'date': date,
-        'driver': currentUser?.name ?? 'Unknown',
-        'name': name,
-        'location': location,
-        'role': role,
-        'image': image,
-        'clockIn': now,
-        'clockOut': null,
-        'isActive': true,
-      };
+      _isLoading = true;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Shift started successfully!'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  }
+    try {
+      // Load completed collections and statistics
+      final now = DateTime.now();
+      DateTime startDate;
+      DateTime endDate;
 
-  void _clockOut(DateTime date) {
-    final dateKey =
-        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    final now = DateTime.now();
+      switch (_selectedPeriod) {
+        case 'Today':
+          startDate = DateTime(now.year, now.month, now.day);
+          endDate = startDate.add(const Duration(days: 1));
+          break;
+        case 'This Week':
+          startDate = now.subtract(Duration(days: now.weekday - 1));
+          endDate = startDate.add(const Duration(days: 7));
+          break;
+        case 'This Month':
+          startDate = DateTime(now.year, now.month, 1);
+          endDate = DateTime(now.year, now.month + 1, 1);
+          break;
+        default:
+          startDate = DateTime(now.year, now.month, now.day);
+          endDate = startDate.add(const Duration(days: 1));
+      }
 
-    if (_attendanceData[dateKey] != null) {
-      setState(() {
-        _attendanceData[dateKey]!['clockOut'] = now;
-        _attendanceData[dateKey]!['isActive'] = false;
-
-        // Add to shift history
-        _shiftHistory.insert(0, {
-          'date': '${date.day}/${date.month}/${date.year}',
-          'driver': _attendanceData[dateKey]!['driver'],
-          'palero1': 'Not assigned',
-          'palero2': 'Not assigned',
-          'palero3': 'Not assigned',
-          'shiftStarted':
-              '${_attendanceData[dateKey]!['clockIn'].hour.toString().padLeft(2, '0')}:${_attendanceData[dateKey]!['clockIn'].minute.toString().padLeft(2, '0')}',
-          'shiftEnded':
-              '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
-        });
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Shift ended successfully!'),
-          backgroundColor: Colors.blue,
-        ),
+      // Get completed collections for the period
+      final collections = await DriverCollectionService.getDriverCollections(
+        startDate: startDate,
+        endDate: endDate,
+        status: CollectionStatus.completed,
       );
+
+      // Get collection statistics
+      final stats = await DriverCollectionService.getDriverCollectionStats(
+        startDate: startDate,
+        endDate: endDate,
+      );
+
+      setState(() {
+        _completedCollections = collections;
+        _collectionStats = stats;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading collection data: $e');
+      setState(() {
+        _isLoading = false;
+      });
     }
-  }
-
-  bool _isShiftActive(DateTime date) {
-    final dateKey =
-        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    return _attendanceData[dateKey]?['isActive'] == true;
-  }
-
-  bool _hasAttendance(DateTime date) {
-    final dateKey =
-        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    return _attendanceData.containsKey(dateKey);
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = FirebaseAuthService.currentUser;
-    final now = DateTime.now();
-    final currentDate = '${now.day}/${now.month}/${now.year}';
-
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Submitting Report'),
+        title: const Text('Collection Reports'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadShiftData,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(AppSizes.paddingLarge),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Report Type Dropdown
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSizes.paddingMedium,
-                  vertical: AppSizes.paddingSmall,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(AppSizes.radiusSmall),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      _selectedReportType,
-                      style: AppTextStyles.body1.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+      body: Column(
+        children: [
+          // Period Selector
+          Container(
+            height: 60,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSizes.paddingMedium,
+              vertical: AppSizes.paddingSmall,
+            ),
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _periodOptions.length,
+              itemBuilder: (context, index) {
+                final option = _periodOptions[index];
+                final isSelected = _selectedPeriod == option;
+
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedPeriod = option;
+                    });
+                    _loadCollectionData();
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(right: AppSizes.paddingSmall),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSizes.paddingMedium,
+                      vertical: AppSizes.paddingSmall,
                     ),
-                    const Spacer(),
-                    const Icon(Icons.keyboard_arrow_down),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: AppSizes.paddingLarge),
-
-              // Calendar Section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  children: [
-                    // Calendar Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        IconButton(
-                          onPressed: () {
-                            setState(() {
-                              _currentDate = DateTime(
-                                _currentDate.year,
-                                _currentDate.month - 1,
-                              );
-                            });
-                          },
-                          icon: const Icon(Icons.chevron_left),
-                        ),
-                        Text(
-                          '${_getMonthName(_currentDate.month)} ${_currentDate.year}',
-                          style: AppTextStyles.heading3.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () {
-                            setState(() {
-                              _currentDate = DateTime(
-                                _currentDate.year,
-                                _currentDate.month + 1,
-                              );
-                            });
-                          },
-                          icon: const Icon(Icons.chevron_right),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSizes.paddingMedium),
-
-                    // Calendar Grid
-                    _buildCalendarGrid(),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: AppSizes.paddingLarge),
-
-              // Today's Attendance Status
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Today's Attendance",
-                      style: AppTextStyles.heading3.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: AppSizes.paddingMedium),
-                    _buildShiftDetailRow('Date', currentDate),
-                    _buildShiftDetailRow(
-                      'Driver',
-                      currentUser?.name ?? 'Unknown',
-                    ),
-
-                    // Show today's attendance status
-                    if (_hasAttendance(DateTime.now())) ...[
-                      Builder(
-                        builder: (context) {
-                          final todayData =
-                              _attendanceData['${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}'];
-                          return Column(
-                            children: [
-                              _buildShiftDetailRow(
-                                'Status',
-                                _isShiftActive(DateTime.now())
-                                    ? 'Active'
-                                    : 'Completed',
-                              ),
-                              if (todayData!['name'] != null)
-                                _buildShiftDetailRow('Name', todayData['name']),
-                              if (todayData['location'] != null)
-                                _buildShiftDetailRow(
-                                  'Location',
-                                  todayData['location'],
-                                ),
-                              if (todayData['role'] != null)
-                                _buildShiftDetailRow('Role', todayData['role']),
-                              if (todayData['image'] != null)
-                                _buildImageRow(
-                                  'Picture',
-                                  todayData['image'] as File,
-                                ),
-                              _buildShiftDetailRow(
-                                'Start Shift',
-                                '${todayData['clockIn'].hour.toString().padLeft(2, '0')}:${todayData['clockIn'].minute.toString().padLeft(2, '0')}',
-                              ),
-                              if (todayData['clockOut'] != null)
-                                _buildShiftDetailRow(
-                                  'End Shift',
-                                  '${todayData['clockOut'].hour.toString().padLeft(2, '0')}:${todayData['clockOut'].minute.toString().padLeft(2, '0')}',
-                                ),
-                            ],
-                          );
-                        },
-                      ),
-                    ] else ...[
-                      _buildShiftDetailRow('Status', 'Not started'),
-                      _buildShiftDetailRow('Name', 'Not recorded'),
-                      _buildShiftDetailRow('Location', 'Not recorded'),
-                      _buildShiftDetailRow('Role', 'Not recorded'),
-                      _buildShiftDetailRow('Picture', 'Not recorded'),
-                      _buildShiftDetailRow('Start Shift', 'Not recorded'),
-                      _buildShiftDetailRow('End Shift', 'Not recorded'),
-                    ],
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: AppSizes.paddingLarge),
-
-              // Divider
-              Container(height: 1, color: AppColors.divider),
-
-              const SizedBox(height: AppSizes.paddingLarge),
-
-              // History Section
-              Text(
-                'History',
-                style: AppTextStyles.heading3.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: AppSizes.paddingMedium),
-
-              // Past Shift History
-              ..._shiftHistory.map(
-                (shift) => Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: AppSizes.paddingMedium),
-                  padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildShiftDetailRow('Date', shift['date']),
-                      _buildShiftDetailRow('Driver', shift['driver']),
-                      _buildShiftDetailRow('Palero 1', shift['palero1']),
-                      _buildShiftDetailRow('Palero 2', shift['palero2']),
-                      _buildShiftDetailRow('Palero 3', shift['palero3']),
-                      _buildShiftDetailRow(
-                        'Shift Started',
-                        shift['shiftStarted'],
-                      ),
-                      _buildShiftDetailRow('Shift Ended', shift['shiftEnded']),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: AppSizes.paddingLarge),
-
-              // Attendance List
-              if (_attendanceList.isNotEmpty) ...[
-                Text(
-                  'Current Attendance',
-                  style: AppTextStyles.heading3.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: AppSizes.paddingMedium),
-                ..._attendanceList.map(
-                  (attendance) => Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(
-                      bottom: AppSizes.paddingSmall,
-                    ),
-                    padding: const EdgeInsets.all(AppSizes.paddingMedium),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: isSelected ? AppColors.primary : Colors.white,
                       borderRadius: BorderRadius.circular(
                         AppSizes.radiusMedium,
                       ),
-                      border: Border.all(color: AppColors.border),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.divider,
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildShiftDetailRow('Name', attendance['name']),
-                        _buildShiftDetailRow(
-                          'Location',
-                          attendance['location'],
+                    child: Center(
+                      child: Text(
+                        option,
+                        style: AppTextStyles.body1.copyWith(
+                          color: isSelected
+                              ? Colors.white
+                              : AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
                         ),
-                        _buildShiftDetailRow('Role', attendance['role']),
-                        _buildShiftDetailRow('Time', attendance['time']),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ],
+                );
+              },
+            ),
           ),
-        ),
+
+          // Content
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppColors.primary,
+                      ),
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadCollectionData,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(AppSizes.paddingMedium),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Statistics Cards
+                          _buildStatisticsCards(),
+
+                          const SizedBox(height: AppSizes.paddingLarge),
+
+                          // Completed Collections
+                          Text(
+                            'Completed Collections',
+                            style: AppTextStyles.heading3.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: AppSizes.paddingMedium),
+
+                          if (_completedCollections.isEmpty)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(
+                                AppSizes.paddingLarge,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(
+                                  AppSizes.radiusMedium,
+                                ),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.assignment_outlined,
+                                    size: 64,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  const SizedBox(
+                                    height: AppSizes.paddingMedium,
+                                  ),
+                                  Text(
+                                    'No Completed Collections',
+                                    style: AppTextStyles.heading3.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSizes.paddingSmall),
+                                  Text(
+                                    'You haven\'t completed any collections for $_selectedPeriod',
+                                    style: AppTextStyles.body2.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            ..._completedCollections.map(
+                              (collection) => _buildCollectionCard(collection),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }
 
-  String _getMonthName(int month) {
-    const months = [
-      'JANUARY',
-      'FEBRUARY',
-      'MARCH',
-      'APRIL',
-      'MAY',
-      'JUNE',
-      'JULY',
-      'AUGUST',
-      'SEPTEMBER',
-      'OCTOBER',
-      'NOVEMBER',
-      'DECEMBER',
-    ];
-    return months[month - 1];
-  }
-
-  Widget _buildCalendarGrid() {
-    final firstDayOfMonth = DateTime(_currentDate.year, _currentDate.month, 1);
-    final lastDayOfMonth = DateTime(
-      _currentDate.year,
-      _currentDate.month + 1,
-      0,
-    );
-    final firstWeekday = firstDayOfMonth.weekday;
-    final daysInMonth = lastDayOfMonth.day;
-
-    // Days of week headers
-    const weekdays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
+  Widget _buildStatisticsCards() {
     return Column(
       children: [
-        // Weekday headers
+        // Row 1: Total Collections and Completed
         Row(
-          children: weekdays
-              .map(
-                (day) => Expanded(
-                  child: Center(
-                    child: Text(
-                      day,
-                      style: AppTextStyles.caption.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                'Total Collections',
+                '${_collectionStats['total_collections'] ?? 0}',
+                Icons.assignment,
+                Colors.blue,
+              ),
+            ),
+            const SizedBox(width: AppSizes.paddingSmall),
+            Expanded(
+              child: _buildStatCard(
+                'Completed',
+                '${_collectionStats['completed_collections'] ?? 0}',
+                Icons.check_circle,
+                Colors.green,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: AppSizes.paddingSmall),
 
-        // Calendar days
-        ...List.generate(6, (weekIndex) {
-          return Row(
-            children: List.generate(7, (dayIndex) {
-              final dayNumber = weekIndex * 7 + dayIndex - firstWeekday + 2;
-
-              if (dayNumber < 1 || dayNumber > daysInMonth) {
-                return Expanded(child: Container(height: 40));
-              }
-
-              final date = DateTime(
-                _currentDate.year,
-                _currentDate.month,
-                dayNumber,
-              );
-              final isToday =
-                  date.day == DateTime.now().day &&
-                  date.month == DateTime.now().month &&
-                  date.year == DateTime.now().year;
-              final hasAttendance = _hasAttendance(date);
-              final isActive = _isShiftActive(date);
-
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => _handleDateTap(date),
-                  child: Container(
-                    height: 40,
-                    margin: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: isToday
-                          ? AppColors.primary.withOpacity(0.1)
-                          : hasAttendance
-                          ? (isActive
-                                ? Colors.green.withOpacity(0.2)
-                                : Colors.blue.withOpacity(0.2))
-                          : null,
-                      borderRadius: BorderRadius.circular(8),
-                      border: isToday
-                          ? Border.all(color: AppColors.primary, width: 2)
-                          : hasAttendance
-                          ? Border.all(
-                              color: isActive ? Colors.green : Colors.blue,
-                              width: 1,
-                            )
-                          : null,
-                    ),
-                    child: Stack(
-                      children: [
-                        Center(
-                          child: Text(
-                            dayNumber.toString(),
-                            style: AppTextStyles.body2.copyWith(
-                              fontWeight: isToday
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              color: isToday
-                                  ? AppColors.primary
-                                  : AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        if (isToday)
-                          Positioned(
-                            bottom: 2,
-                            left: 0,
-                            right: 0,
-                            child: Text(
-                              !hasAttendance
-                                  ? 'start shift'
-                                  : isActive
-                                  ? 'end shift'
-                                  : 'completed',
-                              style: AppTextStyles.caption.copyWith(
-                                color: !hasAttendance
-                                    ? AppColors.primary
-                                    : isActive
-                                    ? Colors.red
-                                    : Colors.blue,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }),
-          );
-        }),
+        // Row 2: Total Weight and Completion Rate
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                'Total Weight',
+                '${_collectionStats['total_weight']?.toStringAsFixed(1) ?? '0.0'} kg',
+                Icons.scale,
+                Colors.orange,
+              ),
+            ),
+            const SizedBox(width: AppSizes.paddingSmall),
+            Expanded(
+              child: _buildStatCard(
+                'Completion Rate',
+                '${(_collectionStats['completion_rate'] ?? 0).toStringAsFixed(1)}%',
+                Icons.trending_up,
+                Colors.purple,
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
 
-  void _handleDateTap(DateTime date) {
-    final isToday =
-        date.day == DateTime.now().day &&
-        date.month == DateTime.now().month &&
-        date.year == DateTime.now().year;
-
-    if (!isToday) return; // Only allow start/end shift for today
-
-    if (_hasAttendance(date)) {
-      if (_isShiftActive(date)) {
-        _clockOut(date);
-      }
-    } else {
-      _clockIn(date);
-    }
-  }
-
-  Widget _buildShiftDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSizes.paddingSmall),
-      child: Row(
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(AppSizes.paddingMedium),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
+          Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: AppSizes.paddingSmall),
+              Expanded(
+                child: Text(
+                  title,
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: AppTextStyles.body2.copyWith(fontWeight: FontWeight.w500),
+          const SizedBox(height: AppSizes.paddingSmall),
+          Text(
+            value,
+            style: AppTextStyles.heading2.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
@@ -1246,35 +334,131 @@ class _DriverReportScreenState extends State<DriverReportScreen> {
     );
   }
 
-  Widget _buildImageRow(String label, File image) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSizes.paddingSmall),
-      child: Row(
+  Widget _buildCollectionCard(WasteCollection collection) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSizes.paddingMedium),
+      padding: const EdgeInsets.all(AppSizes.paddingMedium),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
+          // Header Row
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.check_circle,
+                  color: Colors.green,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: AppSizes.paddingSmall),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      collection.wasteTypeText,
+                      style: AppTextStyles.body1.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '${collection.quantity} ${collection.unit}',
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Completed',
+                  style: AppTextStyles.caption.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: AppSizes.paddingSmall),
+
+          // Address
+          Row(
+            children: [
+              Icon(Icons.location_on, size: 16, color: AppColors.textSecondary),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  collection.address,
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: AppSizes.paddingSmall),
+
+          // Date and Time
+          Row(
+            children: [
+              Icon(Icons.schedule, size: 16, color: AppColors.textSecondary),
+              const SizedBox(width: 4),
+              Text(
+                '${collection.scheduledDate.day}/${collection.scheduledDate.month}/${collection.scheduledDate.year}',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${collection.scheduledDate.hour.toString().padLeft(2, '0')}:${collection.scheduledDate.minute.toString().padLeft(2, '0')}',
+                style: AppTextStyles.body2.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+
+          if (collection.description.isNotEmpty) ...[
+            const SizedBox(height: AppSizes.paddingSmall),
+            Text(
+              collection.description,
               style: AppTextStyles.body2.copyWith(
                 color: AppColors.textSecondary,
+                fontStyle: FontStyle.italic,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          Expanded(
-            child: Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.file(image, fit: BoxFit.cover),
-              ),
-            ),
-          ),
+          ],
         ],
       ),
     );
