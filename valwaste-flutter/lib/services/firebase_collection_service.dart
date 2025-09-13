@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/waste_collection.dart';
+import '../models/user.dart';
 import 'firebase_auth_service.dart';
+import 'enhanced_notification_service.dart';
+import 'route_optimization_service.dart';
 
 class FirebaseCollectionService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -51,6 +54,27 @@ class FirebaseCollectionService {
         type: 'collection',
       );
 
+      // Notify drivers and barangay officials about the new request
+      await _notifyRelevantUsers(collection);
+
+      // Auto-assign collections to drivers if they are scheduled for today
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      if (collection.scheduledDate.isAfter(startOfDay) &&
+          collection.scheduledDate.isBefore(endOfDay)) {
+        // Import and call auto-assignment
+        try {
+          // This will be called asynchronously to avoid blocking the main flow
+          Future.delayed(const Duration(seconds: 2), () async {
+            await RouteOptimizationService.autoAssignCollectionsToDrivers();
+          });
+        } catch (e) {
+          print('Error in auto-assignment: $e');
+        }
+      }
+
       return {
         'success': true,
         'message': 'Collection request submitted successfully!',
@@ -82,6 +106,23 @@ class FirebaseCollectionService {
           .toList();
     } catch (e) {
       print('Error fetching user collections: $e');
+      return [];
+    }
+  }
+
+  // Get all collection requests (for drivers and administrators)
+  static Future<List<WasteCollection>> getAllCollectionRequests() async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('collections')
+          .orderBy('created_at', descending: true)
+          .get();
+
+      return querySnapshot.docs
+          .map((doc) => WasteCollection.fromJson(doc.data()))
+          .toList();
+    } catch (e) {
+      print('Error fetching all collection requests: $e');
       return [];
     }
   }
@@ -132,6 +173,7 @@ class FirebaseCollectionService {
       // Get the collection to create notification
       final collection = await getCollectionById(collectionId);
       if (collection != null) {
+        // Notify the resident about status change
         await _createNotification(
           userId: collection.userId,
           title: 'Collection Status Updated',
@@ -139,6 +181,9 @@ class FirebaseCollectionService {
               'Your ${collection.wasteTypeText} collection status has been updated to ${collection.statusText}.',
           type: 'collection',
         );
+
+        // Notify relevant users about status change
+        await _notifyStatusChange(collection, status);
       }
 
       return {
@@ -251,6 +296,188 @@ class FirebaseCollectionService {
       });
     } catch (e) {
       print('Error creating notification: $e');
+    }
+  }
+
+  // Notify relevant users (drivers and barangay officials) about new collection requests
+  static Future<void> _notifyRelevantUsers(WasteCollection collection) async {
+    try {
+      // Get all drivers
+      final driversSnapshot = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: UserRole.driver.toString())
+          .get();
+
+      // Get all barangay officials
+      final barangayOfficialsSnapshot = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: UserRole.barangayOfficial.toString())
+          .get();
+
+      // Notify drivers
+      for (final doc in driversSnapshot.docs) {
+        await EnhancedNotificationService.sendNotificationToUser(
+          userId: doc.id,
+          title: 'New Collection Request',
+          message:
+              'New ${collection.wasteTypeText} collection request from ${collection.address}',
+          type: 'new_request',
+          data: {
+            'collection_id': collection.id,
+            'waste_type': collection.wasteTypeText,
+            'address': collection.address,
+            'scheduled_date': collection.scheduledDate.toIso8601String(),
+            'quantity': collection.quantity,
+            'unit': collection.unit,
+          },
+        );
+      }
+
+      // Notify barangay officials
+      for (final doc in barangayOfficialsSnapshot.docs) {
+        await EnhancedNotificationService.sendNotificationToUser(
+          userId: doc.id,
+          title: 'New Collection Request',
+          message:
+              'New ${collection.wasteTypeText} collection request from ${collection.address}',
+          type: 'new_request',
+          data: {
+            'collection_id': collection.id,
+            'waste_type': collection.wasteTypeText,
+            'address': collection.address,
+            'scheduled_date': collection.scheduledDate.toIso8601String(),
+            'quantity': collection.quantity,
+            'unit': collection.unit,
+          },
+        );
+      }
+
+      print(
+        'Notified ${driversSnapshot.docs.length} drivers and ${barangayOfficialsSnapshot.docs.length} barangay officials about new collection request',
+      );
+    } catch (e) {
+      print('Error notifying relevant users: $e');
+    }
+  }
+
+  // Notify relevant users about collection status changes
+  static Future<void> _notifyStatusChange(
+    WasteCollection collection,
+    CollectionStatus newStatus,
+  ) async {
+    try {
+      // Get all drivers
+      final driversSnapshot = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: UserRole.driver.toString())
+          .get();
+
+      // Get all barangay officials
+      final barangayOfficialsSnapshot = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: UserRole.barangayOfficial.toString())
+          .get();
+
+      String statusMessage = '';
+      String notificationType = '';
+
+      switch (newStatus) {
+        case CollectionStatus.approved:
+          statusMessage = 'Collection request approved';
+          notificationType = 'collection_approved';
+          break;
+        case CollectionStatus.inProgress:
+          statusMessage = 'Collection in progress';
+          notificationType = 'collection_started';
+          break;
+        case CollectionStatus.completed:
+          statusMessage = 'Collection completed';
+          notificationType = 'collection_completed';
+          break;
+        case CollectionStatus.cancelled:
+          statusMessage = 'Collection cancelled';
+          notificationType = 'collection_cancelled';
+          break;
+        default:
+          statusMessage = 'Collection status updated';
+          notificationType = 'status_update';
+      }
+
+      // Notify drivers
+      for (final doc in driversSnapshot.docs) {
+        await EnhancedNotificationService.sendNotificationToUser(
+          userId: doc.id,
+          title: statusMessage,
+          message:
+              '${collection.wasteTypeText} collection at ${collection.address} - ${statusMessage.toLowerCase()}',
+          type: notificationType,
+          data: {
+            'collection_id': collection.id,
+            'waste_type': collection.wasteTypeText,
+            'address': collection.address,
+            'status': newStatus.toString(),
+            'scheduled_date': collection.scheduledDate.toIso8601String(),
+          },
+        );
+      }
+
+      // Notify barangay officials
+      for (final doc in barangayOfficialsSnapshot.docs) {
+        await EnhancedNotificationService.sendNotificationToUser(
+          userId: doc.id,
+          title: statusMessage,
+          message:
+              '${collection.wasteTypeText} collection at ${collection.address} - ${statusMessage.toLowerCase()}',
+          type: notificationType,
+          data: {
+            'collection_id': collection.id,
+            'waste_type': collection.wasteTypeText,
+            'address': collection.address,
+            'status': newStatus.toString(),
+            'scheduled_date': collection.scheduledDate.toIso8601String(),
+          },
+        );
+      }
+
+      print(
+        'Notified ${driversSnapshot.docs.length} drivers and ${barangayOfficialsSnapshot.docs.length} barangay officials about status change',
+      );
+    } catch (e) {
+      print('Error notifying about status change: $e');
+    }
+  }
+
+  // Get real-time stream of collection requests for map display
+  static Stream<List<WasteCollection>> getCollectionRequestsStream() {
+    return _firestore
+        .collection('collections')
+        .where('status', isEqualTo: 'approved')
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => WasteCollection.fromJson(doc.data()))
+              .toList();
+        });
+  }
+
+  // Get approved collection requests for driver dashboard
+  static Future<List<WasteCollection>> getApprovedCollectionRequests() async {
+    try {
+      final snapshot = await _firestore
+          .collection('collections')
+          .where('status', isEqualTo: 'approved')
+          .get();
+
+      final requests = snapshot.docs
+          .map((doc) => WasteCollection.fromJson(doc.data()))
+          .toList();
+
+      // Sort by created_at in descending order (newest first)
+      requests.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      return requests;
+    } catch (e) {
+      throw Exception('Failed to fetch approved collection requests: $e');
     }
   }
 }

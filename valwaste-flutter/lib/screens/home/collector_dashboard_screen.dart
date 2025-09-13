@@ -248,26 +248,39 @@ class CollectorDashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: AppSizes.paddingMedium),
 
-              // Collection Cards
-              _CollectionCard(
-                address: '123 Main St, Barangay 1',
-                time: '9:30 AM',
-                status: 'Completed',
-                wasteType: 'Regular',
-              ),
-              const SizedBox(height: AppSizes.paddingSmall),
-              _CollectionCard(
-                address: '456 Oak Ave, Barangay 2',
-                time: '10:15 AM',
-                status: 'Completed',
-                wasteType: 'Recyclable',
-              ),
-              const SizedBox(height: AppSizes.paddingSmall),
-              _CollectionCard(
-                address: '789 Pine St, Barangay 3',
-                time: '10:45 AM',
-                status: 'Completed',
-                wasteType: 'Bulk Waste',
+              // Collection Cards - Real Data
+              Container(
+                padding: const EdgeInsets.all(AppSizes.paddingLarge),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+                ),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.inbox_outlined,
+                        size: 48,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: AppSizes.paddingMedium),
+                      Text(
+                        'No recent collections',
+                        style: AppTextStyles.body1.copyWith(
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: AppSizes.paddingSmall),
+                      Text(
+                        'Collection history will appear here when you complete collections.',
+                        style: AppTextStyles.body2.copyWith(
+                          color: Colors.grey.shade500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),

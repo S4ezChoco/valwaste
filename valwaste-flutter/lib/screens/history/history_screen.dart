@@ -547,6 +547,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
         statusColor = Colors.blue;
         statusIcon = Icons.schedule;
         break;
+      case CollectionStatus.approved:
+        statusColor = Colors.lightBlue;
+        statusIcon = Icons.check_circle_outline;
+        break;
       case CollectionStatus.pending:
         statusColor = Colors.orange;
         statusIcon = Icons.pending;

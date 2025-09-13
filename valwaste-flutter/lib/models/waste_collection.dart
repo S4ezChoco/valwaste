@@ -1,4 +1,11 @@
-enum CollectionStatus { pending, scheduled, inProgress, completed, cancelled }
+enum CollectionStatus {
+  pending,
+  approved,
+  scheduled,
+  inProgress,
+  completed,
+  cancelled,
+}
 
 enum WasteType { general, recyclable, organic, hazardous, electronic }
 
@@ -11,10 +18,15 @@ class WasteCollection {
   final String description;
   final DateTime scheduledDate;
   final String address;
+  final double? latitude;
+  final double? longitude;
   final CollectionStatus status;
   final DateTime createdAt;
   final DateTime? completedAt;
   final String? notes;
+  final String? assignedTo;
+  final String? assignedRole;
+  final DateTime? assignedAt;
 
   WasteCollection({
     required this.id,
@@ -25,10 +37,15 @@ class WasteCollection {
     required this.description,
     required this.scheduledDate,
     required this.address,
+    this.latitude,
+    this.longitude,
     required this.status,
     required this.createdAt,
     this.completedAt,
     this.notes,
+    this.assignedTo,
+    this.assignedRole,
+    this.assignedAt,
   });
 
   factory WasteCollection.fromJson(Map<String, dynamic> json) {
@@ -46,6 +63,8 @@ class WasteCollection {
           ? DateTime.parse(json['scheduled_date'])
           : DateTime.now(),
       address: json['address'] ?? '',
+      latitude: json['latitude']?.toDouble(),
+      longitude: json['longitude']?.toDouble(),
       status: CollectionStatus.values.firstWhere(
         (e) => e.toString().split('.').last == json['status'],
         orElse: () => CollectionStatus.pending,
@@ -57,6 +76,11 @@ class WasteCollection {
           ? DateTime.parse(json['completed_at'])
           : null,
       notes: json['notes'],
+      assignedTo: json['assigned_to'],
+      assignedRole: json['assigned_role'],
+      assignedAt: json['assigned_at'] != null
+          ? DateTime.parse(json['assigned_at'])
+          : null,
     );
   }
 
@@ -70,17 +94,24 @@ class WasteCollection {
       'description': description,
       'scheduled_date': scheduledDate.toIso8601String(),
       'address': address,
+      'latitude': latitude,
+      'longitude': longitude,
       'status': status.toString().split('.').last,
       'created_at': createdAt.toIso8601String(),
       'completed_at': completedAt?.toIso8601String(),
       'notes': notes,
+      'assigned_to': assignedTo,
+      'assigned_role': assignedRole,
+      'assigned_at': assignedAt?.toIso8601String(),
     };
   }
 
   String get statusText {
     switch (status) {
       case CollectionStatus.pending:
-        return 'Pending';
+        return 'Pending Approval';
+      case CollectionStatus.approved:
+        return 'Approved';
       case CollectionStatus.scheduled:
         return 'Scheduled';
       case CollectionStatus.inProgress:

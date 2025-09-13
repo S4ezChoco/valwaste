@@ -402,13 +402,35 @@ class FirebaseAuthService {
           // Handle the specific error we're seeing
           if (authError.toString().contains('PigeonUserDetails')) {
             print(
-              'Detected PigeonUserDetails error, user data may be corrupted...',
+              'Detected PigeonUserDetails error, attempting to continue...',
             );
-            return {
-              'success': false,
-              'message':
-                  'Login successful but user data is corrupted. Please contact admin.',
-            };
+            // Try to continue with login despite this error
+            try {
+              // Get current Firebase user
+              final currentUser = _auth.currentUser;
+              if (currentUser != null) {
+                // Force fetch user data after successful auth
+                await _fetchUserFromFirestore(currentUser.uid);
+                return {
+                  'success': true,
+                  'message': 'Login successful',
+                  'user': _currentUser,
+                };
+              } else {
+                return {
+                  'success': false,
+                  'message':
+                      'Login successful but unable to load user data. Please try again.',
+                };
+              }
+            } catch (fetchError) {
+              print('Error fetching user data: $fetchError');
+              return {
+                'success': false,
+                'message':
+                    'Login successful but unable to load user data. Please try again.',
+              };
+            }
           }
 
           if (authError is FirebaseAuthException) {

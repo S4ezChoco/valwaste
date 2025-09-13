@@ -3,6 +3,7 @@ import '../../utils/constants.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../models/user.dart';
 import '../auth/login_screen.dart';
+import '../settings/settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -309,7 +310,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: 'Settings',
                       subtitle: 'App preferences',
                       onTap: () {
-                        // TODO: Navigate to settings
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const SettingsScreen(),
+                          ),
+                        );
                       },
                     ),
                     const SizedBox(height: 6),

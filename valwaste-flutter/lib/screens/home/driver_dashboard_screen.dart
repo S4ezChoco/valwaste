@@ -1,9 +1,103 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../../utils/constants.dart';
 import '../../services/firebase_auth_service.dart';
+import '../../services/firebase_collection_service.dart';
+import '../../models/waste_collection.dart';
+import '../../widgets/announcement_card.dart';
+import '../map/map_screen.dart';
 
-class DriverDashboardScreen extends StatelessWidget {
+class DriverDashboardScreen extends StatefulWidget {
   const DriverDashboardScreen({super.key});
+
+  @override
+  State<DriverDashboardScreen> createState() => _DriverDashboardScreenState();
+}
+
+class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
+  List<WasteCollection> _approvedRequests = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadApprovedRequests();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  Future<void> _loadApprovedRequests() async {
+    try {
+      final requests =
+          await FirebaseCollectionService.getApprovedCollectionRequests();
+      if (mounted) {
+        setState(() {
+          _approvedRequests = requests;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading approved requests: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _startRoute(WasteCollection request) {
+    print('Starting route for: ${request.wasteTypeText}');
+    print(
+      'Request details: ${request.address}, ${request.quantity} ${request.unit}',
+    );
+
+    // Navigate to map screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const MapScreen()),
+    );
+  }
+
+  String _getLocationDisplayName(String address) {
+    // If address contains coordinates, return a generic location name
+    if (address.contains(',') &&
+        RegExp(r'^-?\d+\.?\d*,\s*-?\d+\.?\d*$').hasMatch(address.trim())) {
+      return 'Collection Point';
+    }
+
+    // If address contains "Collection Point", use that
+    if (address.toLowerCase().contains('collection point')) {
+      return address;
+    }
+
+    // If address contains "Valenzuela City", extract the main part
+    if (address.toLowerCase().contains('valenzuela city')) {
+      final parts = address.split(',');
+      if (parts.length > 1) {
+        return parts[0].trim();
+      }
+    }
+
+    // For other addresses, take the first part before comma or use full address if short
+    if (address.contains(',')) {
+      final parts = address.split(',');
+      final firstPart = parts[0].trim();
+      return firstPart.length > 20
+          ? '${firstPart.substring(0, 20)}...'
+          : firstPart;
+    }
+
+    // If address is too long, truncate it
+    if (address.length > 25) {
+      return '${address.substring(0, 25)}...';
+    }
+
+    return address;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,451 +105,228 @@ class DriverDashboardScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSizes.paddingLarge),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Welcome Header
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 25,
-                    backgroundColor: AppColors.primary.withOpacity(0.1),
-                    child: Icon(
-                      Icons.local_shipping,
-                      color: AppColors.primary,
-                      size: 30,
-                    ),
-                  ),
-                  const SizedBox(width: AppSizes.paddingMedium),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Driver',
-                          style: AppTextStyles.body2.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        Text(
-                          currentUser?.name ?? 'Driver',
-                          style: AppTextStyles.heading2.copyWith(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: AppSizes.paddingLarge),
-
-              // Today's Stats
-              Row(
-                children: [
-                  Expanded(
-                    child: _StatCard(
-                      title: 'Today\'s Stops',
-                      value: '23',
-                      icon: Icons.location_on,
-                      color: Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(width: AppSizes.paddingMedium),
-                  Expanded(
-                    child: _StatCard(
-                      title: 'Completed',
-                      value: '18',
-                      icon: Icons.check_circle,
-                      color: Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: AppSizes.paddingMedium),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: _StatCard(
-                      title: 'Remaining',
-                      value: '5',
-                      icon: Icons.pending,
-                      color: Colors.orange,
-                    ),
-                  ),
-                  const SizedBox(width: AppSizes.paddingMedium),
-                  Expanded(
-                    child: _StatCard(
-                      title: 'Efficiency',
-                      value: '78%',
-                      icon: Icons.trending_up,
-                      color: Colors.purple,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: AppSizes.paddingLarge),
-
-              // Current Route
-              Text(
-                'Current Route',
-                style: AppTextStyles.heading3.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: AppSizes.paddingMedium),
-
-              Container(
-                padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.route, color: AppColors.primary),
-                        const SizedBox(width: AppSizes.paddingSmall),
-                        Text(
-                          'Route A - Morning Shift',
-                          style: AppTextStyles.body1.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSizes.paddingSmall),
-                    Text(
-                      'Next stop: 123 Main St, Barangay 1',
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: AppSizes.paddingSmall),
-                    LinearProgressIndicator(
-                      value: 0.75,
-                      backgroundColor: AppColors.border,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: AppSizes.paddingSmall),
-                    Text(
-                      '75% Complete',
-                      style: AppTextStyles.body2.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: AppSizes.paddingLarge),
-
-              // Quick Actions
-              Text(
-                'Quick Actions',
-                style: AppTextStyles.heading3.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: AppSizes.paddingMedium),
-
-              // Action Cards
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: AppSizes.paddingMedium,
-                mainAxisSpacing: AppSizes.paddingMedium,
-                childAspectRatio: 1.2,
-                children: [
-                  _ActionCard(
-                    icon: Icons.map_outlined,
-                    title: 'View Route',
-                    subtitle: 'See today\'s route',
-                    color: AppColors.primary,
-                    onTap: () {
-                      // Navigate to map
-                    },
-                  ),
-                  _ActionCard(
-                    icon: Icons.check_circle_outline,
-                    title: 'Mark Complete',
-                    subtitle: 'Update collection status',
-                    color: Colors.green,
-                    onTap: () {
-                      // Mark collection complete
-                    },
-                  ),
-                  _ActionCard(
-                    icon: Icons.schedule_outlined,
-                    title: 'Schedule',
-                    subtitle: 'View collection schedule',
-                    color: Colors.orange,
-                    onTap: () {
-                      // Navigate to schedule
-                    },
-                  ),
-                  _ActionCard(
-                    icon: Icons.report_problem_outlined,
-                    title: 'Report Issue',
-                    subtitle: 'Report problems',
-                    color: Colors.red,
-                    onTap: () {
-                      // Report issue
-                    },
-                  ),
-                  _ActionCard(
-                    icon: Icons.location_on_outlined,
-                    title: 'Start Route',
-                    subtitle: 'Begin collection route',
-                    color: Colors.blue,
-                    onTap: () {
-                      // Start route
-                    },
-                  ),
-                  _ActionCard(
-                    icon: Icons.stop_outlined,
-                    title: 'End Route',
-                    subtitle: 'Finish collection route',
-                    color: Colors.grey,
-                    onTap: () {
-                      // End route
-                    },
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: AppSizes.paddingLarge),
-
-              // Next Stops
-              Text(
-                'Next Stops',
-                style: AppTextStyles.heading3.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: AppSizes.paddingMedium),
-
-              // Stop Cards
-              _StopCard(
-                address: '123 Main St, Barangay 1',
-                time: '9:30 AM',
-                wasteType: 'Regular',
-                status: 'Pending',
-              ),
-              const SizedBox(height: AppSizes.paddingSmall),
-              _StopCard(
-                address: '456 Oak Ave, Barangay 2',
-                time: '10:00 AM',
-                wasteType: 'Recyclable',
-                status: 'Pending',
-              ),
-              const SizedBox(height: AppSizes.paddingSmall),
-              _StopCard(
-                address: '789 Pine St, Barangay 3',
-                time: '10:30 AM',
-                wasteType: 'Bulk Waste',
-                status: 'Pending',
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSizes.paddingMedium),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: Stack(
         children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: AppSizes.paddingSmall),
-              Text(
-                title,
-                style: AppTextStyles.body2.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSizes.paddingSmall),
-          Text(
-            value,
-            style: AppTextStyles.heading2.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _ActionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(AppSizes.paddingMedium),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-          border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 32, color: color),
-            const SizedBox(height: AppSizes.paddingSmall),
-            Text(
-              title,
-              style: AppTextStyles.body1.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: AppTextStyles.body2.copyWith(
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StopCard extends StatelessWidget {
-  final String address;
-  final String time;
-  final String wasteType;
-  final String status;
-
-  const _StopCard({
-    required this.address,
-    required this.time,
-    required this.wasteType,
-    required this.status,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSizes.paddingMedium),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.location_on, color: AppColors.primary, size: 24),
-          const SizedBox(width: AppSizes.paddingMedium),
-          Expanded(
+          // Main Map Content
+          SafeArea(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  address,
-                  style: AppTextStyles.body1.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                // Header with ValWaste title
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSizes.paddingLarge),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(20),
+                      bottomRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 25,
+                            backgroundColor: Colors.white.withValues(
+                              alpha: 0.2,
+                            ),
+                            child: Icon(
+                              Icons.local_shipping,
+                              color: Colors.white,
+                              size: 30,
+                            ),
+                          ),
+                          const SizedBox(width: AppSizes.paddingMedium),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Welcome back, ${currentUser?.name ?? 'Driver'}!',
+                                  style: AppTextStyles.heading2.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  'Driver of ValWaste',
+                                  style: AppTextStyles.body2.copyWith(
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSizes.paddingMedium),
+                      // ValWaste Title
+                      Text(
+                        'ValWaste',
+                        style: AppTextStyles.heading1.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 28,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  '$wasteType • $time',
-                  style: AppTextStyles.body2.copyWith(
-                    color: AppColors.textSecondary,
+
+                // Map takes remaining space
+                Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.all(AppSizes.paddingLarge),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(
+                        AppSizes.radiusMedium,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(
+                        AppSizes.radiusMedium,
+                      ),
+                      child: const MapScreen(),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSizes.paddingSmall,
-              vertical: 4,
-            ),
-            decoration: BoxDecoration(
-              color: status == 'Pending' ? Colors.orange : Colors.green,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              status,
-              style: AppTextStyles.body2.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+
+          // Announcement Overlay (if there are announcements)
+          Positioned(
+            bottom: 100,
+            left: AppSizes.paddingLarge,
+            right: AppSizes.paddingLarge,
+            child: LatestAnnouncementCard(),
+          ),
+
+          // Approved Requests Overlay (if there are requests)
+          if (_approvedRequests.isNotEmpty)
+            Positioned(
+              top: 200,
+              left: AppSizes.paddingLarge,
+              right: AppSizes.paddingLarge,
+              child: Container(
+                padding: const EdgeInsets.all(AppSizes.paddingMedium),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Approved Requests',
+                      style: AppTextStyles.heading3.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: AppSizes.paddingSmall),
+                    ..._approvedRequests
+                        .take(2)
+                        .map(
+                          (request) => Container(
+                            margin: const EdgeInsets.only(
+                              bottom: AppSizes.paddingSmall,
+                            ),
+                            padding: const EdgeInsets.all(
+                              AppSizes.paddingSmall,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                    size: 16,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSizes.paddingSmall),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _getLocationDisplayName(
+                                          request.address,
+                                        ),
+                                        style: AppTextStyles.body2.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        request.wasteTypeText,
+                                        style: AppTextStyles.caption.copyWith(
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => _startRoute(request),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSizes.paddingSmall,
+                                      vertical: 4,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Start',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    if (_approvedRequests.length > 2)
+                      Text(
+                        '+${_approvedRequests.length - 2} more requests',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
