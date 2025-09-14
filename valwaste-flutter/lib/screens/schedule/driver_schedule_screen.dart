@@ -80,7 +80,7 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
       // Filter out cancelled or completed schedules
       final activeSchedules = allSchedules.where((schedule) {
         final status = schedule['status'] ?? 'scheduled';
-        return status == 'scheduled' || status == 'in_progress';
+        return status == 'scheduled' || status == 'inProgress';
       }).toList();
 
       // Sort by date and start time
@@ -98,14 +98,19 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
     }
   }
 
-  List<Map<String, dynamic>> _filterSchedules(List<Map<String, dynamic>> schedules) {
+  List<Map<String, dynamic>> _filterSchedules(
+    List<Map<String, dynamic>> schedules,
+  ) {
     final now = DateTime.now();
-    
+
     // Today's date in multiple possible formats to match PHP admin
-    final todayString = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    final todayStringAlt = '${now.day}/${now.month}/${now.year}'; // D/M/YYYY format (14/9/2025)
-    final todayStringAlt2 = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}'; // DD/MM/YYYY format
-    
+    final todayString =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final todayStringAlt =
+        '${now.day}/${now.month}/${now.year}'; // D/M/YYYY format (14/9/2025)
+    final todayStringAlt2 =
+        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}'; // DD/MM/YYYY format
+
     print('=== DATE FILTER DEBUG ===');
     print('Current DateTime: $now');
     print('Today filter options:');
@@ -113,7 +118,7 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
     print('  Format 2: "$todayStringAlt" (D/M/YYYY)');
     print('  Format 3: "$todayStringAlt2" (DD/MM/YYYY)');
     print('Total schedules: ${schedules.length}');
-    
+
     // Print all schedule dates for debugging
     for (int i = 0; i < schedules.length; i++) {
       final scheduleData = schedules[i];
@@ -128,32 +133,32 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
         final todaySchedules = schedules.where((schedule) {
           final scheduleDate = schedule['date'] ?? '';
           print('\nChecking schedule date: "$scheduleDate"');
-          
+
           if (scheduleDate.isEmpty) {
             print('  Empty date, skipping');
             return false;
           }
-          
+
           // Try multiple format matches
           if (scheduleDate == todayString) {
             print('  ✅ Exact match with YYYY-MM-DD format');
             return true;
           }
-          
+
           if (scheduleDate == todayStringAlt) {
             print('  ✅ Exact match with D/M/YYYY format');
             return true;
           }
-          
+
           if (scheduleDate == todayStringAlt2) {
             print('  ✅ Exact match with DD/MM/YYYY format');
             return true;
           }
-          
+
           // Try parsing the date and comparing
           try {
             DateTime? scheduleDateTime;
-            
+
             // Try different parsing approaches
             if (scheduleDate.contains('-')) {
               // YYYY-MM-DD format
@@ -168,16 +173,17 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                 scheduleDateTime = DateTime(year, month, day);
               }
             }
-            
+
             if (scheduleDateTime != null) {
               final todayStart = DateTime(now.year, now.month, now.day);
-              final isSameDay = scheduleDateTime.year == todayStart.year &&
+              final isSameDay =
+                  scheduleDateTime.year == todayStart.year &&
                   scheduleDateTime.month == todayStart.month &&
                   scheduleDateTime.day == todayStart.day;
-              
+
               print('  Parsed: schedule=$scheduleDateTime, today=$todayStart');
               print('  Same day: $isSameDay');
-              
+
               if (isSameDay) {
                 print('  ✅ Date parsing match!');
                 return true;
@@ -186,11 +192,11 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
           } catch (e) {
             print('  ❌ Error parsing date: $e');
           }
-          
+
           print('  ❌ No match found');
           return false;
         }).toList();
-        
+
         print('Found ${todaySchedules.length} schedules for TODAY');
         print('=== END DEBUG ===');
         return todaySchedules;
@@ -198,14 +204,16 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
       case 'This Week':
         final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
         final endOfWeek = startOfWeek.add(const Duration(days: 6));
-        
+
         return schedules.where((schedule) {
           final scheduleDateString = schedule['date'] ?? '';
           if (scheduleDateString.isEmpty) return false;
-          
+
           try {
             final scheduleDate = DateTime.parse(scheduleDateString);
-            return scheduleDate.isAfter(startOfWeek.subtract(const Duration(days: 1))) &&
+            return scheduleDate.isAfter(
+                  startOfWeek.subtract(const Duration(days: 1)),
+                ) &&
                 scheduleDate.isBefore(endOfWeek.add(const Duration(days: 1)));
           } catch (e) {
             return false;
@@ -247,17 +255,14 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
 
       if (confirmed == true) {
         print('Marking schedule as done: ${schedule['id']}');
-        
+
         try {
           // Update status to completed in Firestore
           await FirebaseFirestore.instance
               .collection('truck_schedule')
               .doc(schedule['id'])
-              .update({
-            'status': 'completed',
-            'completedAt': Timestamp.now(),
-          });
-          
+              .update({'status': 'completed', 'completedAt': Timestamp.now()});
+
           print('Successfully updated schedule status to completed');
 
           ScaffoldMessenger.of(context).showSnackBar(
@@ -293,7 +298,7 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
     switch (status.toLowerCase()) {
       case 'scheduled':
         return Colors.purple;
-      case 'in_progress':
+      case 'inProgress':
         return Colors.orange;
       case 'completed':
         return Colors.green;
@@ -304,10 +309,7 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
     }
   }
 
-  Widget _buildScheduleCard(
-    Map<String, dynamic> schedule,
-    int scheduleNumber,
-  ) {
+  Widget _buildScheduleCard(Map<String, dynamic> schedule, int scheduleNumber) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSizes.paddingMedium),
       padding: const EdgeInsets.all(AppSizes.paddingMedium),
@@ -369,7 +371,9 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                             child: Text(
                               (schedule['status'] ?? 'scheduled').toUpperCase(),
                               style: AppTextStyles.caption.copyWith(
-                                color: _getStatusColor(schedule['status'] ?? 'scheduled'),
+                                color: _getStatusColor(
+                                  schedule['status'] ?? 'scheduled',
+                                ),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -462,7 +466,11 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.calendar_today, size: 12, color: Colors.purple),
+                          Icon(
+                            Icons.calendar_today,
+                            size: 12,
+                            color: Colors.purple,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             _formatDate(schedule['date'] ?? ''),
@@ -507,7 +515,9 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                 height: 32,
                 child: MaterialButton(
                   onPressed: () {
-                    print('Done button pressed for schedule: ${schedule['id']}');
+                    print(
+                      'Done button pressed for schedule: ${schedule['id']}',
+                    );
                     _markAsDone(schedule);
                   },
                   color: Colors.green,
@@ -702,10 +712,7 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
                         itemCount: _assignedSchedules.length,
                         itemBuilder: (context, index) {
                           final schedule = _assignedSchedules[index];
-                          return _buildScheduleCard(
-                            schedule,
-                            index + 1,
-                          );
+                          return _buildScheduleCard(schedule, index + 1);
                         },
                       ),
                     ),
@@ -718,7 +725,7 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
 
   String _formatDate(String dateString) {
     if (dateString.isEmpty) return 'No date';
-    
+
     try {
       final date = DateTime.parse(dateString);
       return '${date.day}/${date.month}/${date.year}';

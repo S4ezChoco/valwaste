@@ -21,13 +21,22 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
   final _addressController = TextEditingController();
 
   WasteType _selectedWasteType = WasteType.general;
-  DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
-  String _selectedTimeSlot = '08:00-10:00';
   double _estimatedWeight = 5.0;
   bool _isLoading = false;
   bool _isUrgent = false;
-  List<String> _availableTimeSlots = [];
-  List<String> _alternativeDates = [];
+
+  // Priority and Category fields
+  String _selectedPriority = 'Medium';
+  String _selectedCategory = 'Collection Request';
+
+  // Available options
+  final List<String> _priorityOptions = ['High', 'Medium', 'Low'];
+  final List<String> _categoryOptions = [
+    'Collection Request',
+    'Missed Collection',
+    'Illegal Dumping',
+    'Complaint',
+  ];
 
   // Location variables
   double? _currentLatitude;
@@ -36,16 +45,11 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
 
   // Enhanced features
   bool _showCollectionTips = false;
-  Map<String, dynamic>? _selectedBarangay;
-  List<Map<String, dynamic>> _barangays = [];
 
   @override
   void initState() {
     super.initState();
-    _loadUserPreferences();
-    _loadAvailableTimeSlots();
     _getCurrentLocation();
-    _loadBarangays();
   }
 
   @override
@@ -55,36 +59,78 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
     super.dispose();
   }
 
-  Future<void> _loadUserPreferences() async {
-    try {
-      final preferences =
-          await AdvancedSchedulingService.getUserSchedulingPreferences();
-      setState(() {
-        if (preferences['preferred_time_slots'] != null) {
-          _selectedTimeSlot =
-              preferences['preferred_time_slots'][0] ?? '08:00-10:00';
-        }
-      });
-    } catch (e) {
-      print('Error loading user preferences: $e');
+  // Helper methods for enhanced UI
+  Widget _buildSectionTitle(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primary, size: 20),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: AppTextStyles.body1.copyWith(
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF374151),
+          ),
+        ),
+      ],
+    );
+  }
+
+  IconData _getWasteTypeIcon(WasteType wasteType) {
+    switch (wasteType) {
+      case WasteType.general:
+        return Icons.delete;
+      case WasteType.recyclable:
+        return Icons.recycling;
+      case WasteType.organic:
+        return Icons.eco;
+      case WasteType.hazardous:
+        return Icons.warning;
+      case WasteType.electronic:
+        return Icons.devices;
+      default:
+        return Icons.category;
     }
   }
 
-  Future<void> _loadAvailableTimeSlots() async {
-    try {
-      final slots = await AdvancedSchedulingService.getAvailableTimeSlots(
-        date: _selectedDate,
-        wasteType: _selectedWasteType,
-        barangay: 'Valenzuela City', // Default barangay
-      );
-      setState(() {
-        _availableTimeSlots = slots;
-        if (slots.isNotEmpty && !slots.contains(_selectedTimeSlot)) {
-          _selectedTimeSlot = slots.first;
-        }
-      });
-    } catch (e) {
-      print('Error loading available time slots: $e');
+  Color _getPriorityColor(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'high':
+        return Colors.red;
+      case 'medium':
+        return Colors.orange;
+      case 'low':
+        return Colors.green;
+      default:
+        return AppColors.primary;
+    }
+  }
+
+  IconData _getPriorityIcon(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'high':
+        return Icons.priority_high;
+      case 'medium':
+        return Icons.remove;
+      case 'low':
+        return Icons.keyboard_arrow_down;
+      default:
+        return Icons.priority_high;
+    }
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Collection Request':
+        return Icons.recycling;
+      case 'Missed Collection':
+        return Icons.schedule;
+      case 'Illegal Dumping':
+        return Icons.warning;
+      case 'Complaint':
+        return Icons.feedback;
+      default:
+        return Icons.category;
     }
   }
 
@@ -226,50 +272,6 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
     }
   }
 
-  Future<void> _loadBarangays() async {
-    // Mock barangay data - in real app, this would come from your backend
-    setState(() {
-      _barangays = [
-        {
-          'name': 'Barangay Isla',
-          'code': 'isla',
-          'coordinates': {'lat': 14.6950, 'lng': 120.9750},
-        },
-        {
-          'name': 'Barangay Malanday',
-          'code': 'malanday',
-          'coordinates': {'lat': 14.7100, 'lng': 120.9900},
-        },
-        {
-          'name': 'Barangay Marulas',
-          'code': 'marulas',
-          'coordinates': {'lat': 14.6900, 'lng': 120.9750},
-        },
-        {
-          'name': 'Barangay Karuhatan',
-          'code': 'karuhatan',
-          'coordinates': {'lat': 14.7000, 'lng': 120.9800},
-        },
-        {
-          'name': 'Barangay Dalandanan',
-          'code': 'dalandanan',
-          'coordinates': {'lat': 14.7050, 'lng': 120.9850},
-        },
-      ];
-
-      // Set default barangay based on current user
-      final currentUser = FirebaseAuthService.currentUser;
-      if (currentUser?.barangay != null) {
-        _selectedBarangay = _barangays.firstWhere(
-          (barangay) => barangay['name'] == currentUser!.barangay,
-          orElse: () => _barangays.first,
-        );
-      } else {
-        _selectedBarangay = _barangays.first;
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     // Check if user is a resident
@@ -334,9 +336,25 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Request Collection'),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.recycling, size: 24, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Request Collection',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
+            ),
+          ],
+        ),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -345,7 +363,37 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+              colors: [
+                AppColors.primary,
+                AppColors.primary.withOpacity(0.9),
+                const Color(0xFF2E7D32),
+              ],
+            ),
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: Colors.white.withOpacity(0.9),
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Fill out the form below to request waste collection',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -405,59 +453,6 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
                         ),
                       ),
                     ],
-                  ),
-                ),
-
-                const SizedBox(height: AppSizes.paddingLarge),
-
-                // Barangay Selection
-                Text(
-                  'Barangay',
-                  style: AppTextStyles.body1.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: AppSizes.paddingSmall),
-                Container(
-                  padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                    border: Border.all(color: AppColors.divider),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<Map<String, dynamic>>(
-                      value: _selectedBarangay,
-                      isExpanded: true,
-                      icon: const Icon(
-                        Icons.arrow_drop_down,
-                        color: AppColors.primary,
-                      ),
-                      items: _barangays.map((barangay) {
-                        return DropdownMenuItem<Map<String, dynamic>>(
-                          value: barangay,
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.location_city,
-                                color: AppColors.primary,
-                                size: 20,
-                              ),
-                              const SizedBox(width: AppSizes.paddingSmall),
-                              Text(
-                                barangay['name'],
-                                style: AppTextStyles.body1,
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedBarangay = value;
-                        });
-                      },
-                    ),
                   ),
                 ),
 
@@ -608,109 +603,6 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
                       );
                     }).toList(),
                   ),
-                ),
-
-                const SizedBox(height: AppSizes.paddingLarge),
-
-                // Date and Time Selection
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Preferred Date',
-                            style: AppTextStyles.body1.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: AppSizes.paddingSmall),
-                          InkWell(
-                            onTap: _selectDate,
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(
-                                AppSizes.paddingMedium,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                borderRadius: BorderRadius.circular(
-                                  AppSizes.radiusMedium,
-                                ),
-                                border: Border.all(color: AppColors.divider),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.calendar_today,
-                                    color: AppColors.primary,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: AppSizes.paddingSmall),
-                                  Text(
-                                    '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                                    style: AppTextStyles.body1,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: AppSizes.paddingMedium),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Time Slot',
-                            style: AppTextStyles.body1.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: AppSizes.paddingSmall),
-                          InkWell(
-                            onTap: _selectTimeSlot,
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(
-                                AppSizes.paddingMedium,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                borderRadius: BorderRadius.circular(
-                                  AppSizes.radiusMedium,
-                                ),
-                                border: Border.all(color: AppColors.divider),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.access_time,
-                                    color: AppColors.primary,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: AppSizes.paddingSmall),
-                                  Expanded(
-                                    child: Text(
-                                      _selectedTimeSlot,
-                                      style: AppTextStyles.body1,
-                                    ),
-                                  ),
-                                  const Icon(
-                                    Icons.arrow_drop_down,
-                                    color: AppColors.primary,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
 
                 const SizedBox(height: AppSizes.paddingLarge),
@@ -911,6 +803,74 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
 
                 const SizedBox(height: AppSizes.paddingLarge),
 
+                // Priority Selection
+                Text(
+                  'Priority',
+                  style: AppTextStyles.body1.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSizes.paddingSmall),
+                Container(
+                  padding: const EdgeInsets.all(AppSizes.paddingMedium),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: Column(
+                    children: _priorityOptions.map((priority) {
+                      return RadioListTile<String>(
+                        title: Text(priority),
+                        value: priority,
+                        groupValue: _selectedPriority,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedPriority = value!;
+                          });
+                        },
+                        activeColor: AppColors.primary,
+                      );
+                    }).toList(),
+                  ),
+                ),
+
+                const SizedBox(height: AppSizes.paddingLarge),
+
+                // Category Selection
+                Text(
+                  'Category',
+                  style: AppTextStyles.body1.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSizes.paddingSmall),
+                Container(
+                  padding: const EdgeInsets.all(AppSizes.paddingMedium),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: Column(
+                    children: _categoryOptions.map((category) {
+                      return RadioListTile<String>(
+                        title: Text(category),
+                        value: category,
+                        groupValue: _selectedCategory,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedCategory = value!;
+                          });
+                        },
+                        activeColor: AppColors.primary,
+                      );
+                    }).toList(),
+                  ),
+                ),
+
+                const SizedBox(height: AppSizes.paddingLarge),
+
                 // Urgent Collection Checkbox
                 Container(
                   padding: const EdgeInsets.all(AppSizes.paddingMedium),
@@ -1037,72 +997,6 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
     );
   }
 
-  Future<void> _selectDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime.now().add(const Duration(days: 1)),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-    }
-  }
-
-  Future<void> _selectTimeSlot() async {
-    if (_availableTimeSlots.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No available time slots for the selected date'),
-          backgroundColor: AppColors.warning,
-        ),
-      );
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(AppSizes.paddingLarge),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Select Time Slot',
-              style: AppTextStyles.heading3.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: AppSizes.paddingMedium),
-            ..._availableTimeSlots.map(
-              (slot) => ListTile(
-                title: Text(slot),
-                leading: Icon(
-                  Icons.access_time,
-                  color: _selectedTimeSlot == slot
-                      ? AppColors.primary
-                      : AppColors.textSecondary,
-                ),
-                trailing: _selectedTimeSlot == slot
-                    ? const Icon(Icons.check, color: AppColors.primary)
-                    : null,
-                onTap: () {
-                  setState(() {
-                    _selectedTimeSlot = slot;
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Future<void> _submitRequest() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -1111,25 +1005,21 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
     });
 
     try {
-      // Get selected barangay
-      final selectedBarangay = _selectedBarangay?['name'] ?? 'Valenzuela City';
-
       final result = await AdvancedSchedulingService.scheduleCollection(
         wasteType: _selectedWasteType,
         quantity: _estimatedWeight,
         unit: 'kg',
         description: _descriptionController.text.trim(),
-        preferredDate: _selectedDate,
-        preferredTimeSlot: _selectedTimeSlot,
         address: _addressController.text.trim(),
-        barangay: selectedBarangay, // Use selected barangay
+        barangay: 'Valenzuela City', // Default barangay
         latitude: _currentLatitude,
         longitude: _currentLongitude,
         notes: _descriptionController.text.trim().isNotEmpty
             ? _descriptionController.text.trim()
             : null,
         isUrgent: _isUrgent,
-        alternativeDates: _alternativeDates,
+        priority: _selectedPriority,
+        category: _selectedCategory,
       );
 
       if (mounted) {
@@ -1140,6 +1030,8 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
               backgroundColor: AppColors.success,
             ),
           );
+          // Add a small delay to ensure data is saved before navigating back
+          await Future.delayed(const Duration(milliseconds: 500));
           Navigator.of(context).pop();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(

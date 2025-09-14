@@ -12,6 +12,55 @@
             position: relative;
             width: 100%;
         }
+        
+        /* Resident Location Styling */
+        .street-item[data-street="Resident Location"] {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 2px solid #0ea5e9;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            padding: 8px;
+        }
+        
+        .street-item[data-street="Resident Location"] .street-name {
+            font-weight: bold;
+            color: #0369a1;
+        }
+        
+        .street-item[data-street="Resident Location"] .street-address {
+            color: #0c4a6e;
+            font-size: 0.9em;
+        }
+        
+        .street-item[data-street="Resident Location"] input[type="checkbox"]:checked + .checkmark {
+            background-color: #0ea5e9;
+            border-color: #0ea5e9;
+        }
+        
+        /* Resident Location Marker Styling */
+        .resident-location-marker {
+            background: none !important;
+            border: none !important;
+        }
+        
+        .resident-location-marker div {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
         .dropdown-button {
             width: 100%;
             padding: 12px 16px;
@@ -296,6 +345,15 @@
                             <p class="sched-sub">Manage truck collection schedules</p>
                         </div>
                         <div style="display: flex; align-items: center; gap: 12px;">
+                            <button type="button" class="btn-outline" onclick="loadApprovedRequests()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14,2 14,8 20,8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                </svg>
+                                Approved Requests
+                            </button>
                             <button type="button" class="btn-primary" onclick="openCreateModal()">Create Schedule</button>
                         </div>
                     </div>
@@ -423,6 +481,19 @@
             <p class="um-modal-sub">Fill details</p>
 
             <form id="createScheduleForm" class="um-form sched-modal-scroll" onsubmit="handleCreateSchedule(event)">
+                <label class="um-field">
+                    <span class="um-label">Select Approved Request</span>
+                    <div class="um-select-wrap">
+                        <select class="um-select" id="approved-request-select" onchange="loadApprovedRequestDetails()">
+                            <option value="" disabled selected>Select approved collection request</option>
+                            <!-- Approved requests will be loaded from Firebase -->
+                        </select>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="um-select-caret">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                </label>
+
                 <label class="um-field">
                     <span class="um-label">Select Truck</span>
                     <div class="um-select-wrap">
@@ -596,6 +667,31 @@
             <div class="sched-modal-actions">
                 <button type="button" class="btn-ghost" onclick="closeDaySchedulesModal()">Close</button>
                 <button type="button" class="btn-primary" onclick="createNewScheduleForDay()">Add New Schedule</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Approved Requests Modal -->
+    <div class="um-modal" id="approved-requests-modal" style="display: none;">
+        <div class="um-modal-card large" role="dialog" aria-modal="true">
+            <button class="um-modal-close" aria-label="Close" onclick="closeApprovedRequestsModal()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+
+            <h3 class="um-modal-title">Approved Collection Requests</h3>
+            <p class="um-modal-sub">Schedule approved requests for collection</p>
+
+            <div class="approved-requests-container" style="max-height: 500px; overflow-y: auto; margin-top: 16px;">
+                <div id="approved-requests-list">
+                    <!-- Approved requests will be loaded here -->
+                </div>
+            </div>
+
+            <div class="um-modal-actions">
+                <button type="button" class="btn-ghost" onclick="closeApprovedRequestsModal()">Close</button>
             </div>
         </div>
     </div>

@@ -18,27 +18,59 @@ class ResidentDashboardScreen extends StatefulWidget {
       _ResidentDashboardScreenState();
 }
 
-class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
+class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
+    with WidgetsBindingObserver {
   Map<String, dynamic> _stats = {};
   List<Map<String, dynamic>> _recentCollections = [];
   bool _isLoading = true;
+  DateTime? _lastUpdated;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadDashboardData();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh data when app becomes active
+      _loadDashboardData();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh data when returning to this screen
     _loadDashboardData();
   }
 
   Future<void> _loadDashboardData() async {
     try {
       final currentUser = FirebaseAuthService.currentUser;
-      if (currentUser == null) return;
+      if (currentUser == null) {
+        print('❌ No current user found');
+        return;
+      }
+
+      print('🔄 Loading dashboard data for user: ${currentUser.id}');
 
       // Load user statistics
       final stats = await FirebaseCollectionService.getUserCollectionStats();
+      print('📊 Stats loaded: $stats');
 
       // Load recent collections
       final collections = await FirebaseCollectionService.getUserCollections();
+      print('📦 Collections loaded: ${collections.length} total');
+
       final recentCollections = collections
           .take(3)
           .map(
@@ -59,13 +91,19 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
           .where((collection) => collection.createdAt.isAfter(startOfMonth))
           .length;
 
+      print('📅 This month collections: $thisMonthCollections');
+      print('📋 Recent collections: ${recentCollections.length}');
+
       setState(() {
         _stats = {...stats, 'thisMonthCollections': thisMonthCollections};
         _recentCollections = recentCollections;
         _isLoading = false;
+        _lastUpdated = DateTime.now();
       });
+
+      print('✅ Dashboard data loaded successfully');
     } catch (e) {
-      print('Error loading dashboard data: $e');
+      print('❌ Error loading dashboard data: $e');
       setState(() {
         _isLoading = false;
       });
@@ -221,10 +259,36 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen> {
                       ),
                     ),
                     const Spacer(),
-                    IconButton(
-                      onPressed: _loadDashboardData,
-                      icon: const Icon(Icons.refresh),
-                      tooltip: 'Refresh Data',
+                    if (_lastUpdated != null) ...[
+                      Text(
+                        'Updated: ${_lastUpdated!.hour}:${_lastUpdated!.minute.toString().padLeft(2, '0')}',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(width: AppSizes.paddingSmall),
+                    ],
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: IconButton(
+                        onPressed: _isLoading ? null : _loadDashboardData,
+                        icon: _isLoading
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Icon(Icons.refresh, color: Colors.white),
+                        tooltip: 'Refresh Data',
+                      ),
                     ),
                   ],
                 ),

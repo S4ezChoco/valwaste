@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import '../models/waste_collection.dart';
 import '../models/user.dart';
 
@@ -199,18 +200,52 @@ class RouteOptimizationService {
       final userLocation = await _getUserCurrentLocation(userId);
 
       final querySnapshot = await query.get();
-      final allCollections = querySnapshot.docs
-          .map(
-            (doc) =>
-                WasteCollection.fromJson(doc.data() as Map<String, dynamic>),
-          )
-          .toList();
+      print(
+        'Found ${querySnapshot.docs.length} total scheduled/inProgress collections',
+      );
+
+      final allCollections = querySnapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id; // Add document ID
+        return WasteCollection.fromJson(data);
+      }).toList();
+
+      print('Parsed ${allCollections.length} collections');
+      for (var collection in allCollections) {
+        print(
+          'Collection ${collection.id}: status=${collection.status}, assignedTo=${collection.assignedTo}, scheduledDate=${collection.scheduledDate}',
+        );
+      }
+
+      print('Target date range: startOfDay=$startOfDay, endOfDay=$endOfDay');
 
       // Filter by date range in memory to avoid index requirements
       final collections = allCollections.where((collection) {
-        return collection.scheduledDate.isAfter(startOfDay) &&
-            collection.scheduledDate.isBefore(endOfDay);
+        // Compare only the date part, not the time
+        final collectionDate = DateTime(
+          collection.scheduledDate.year,
+          collection.scheduledDate.month,
+          collection.scheduledDate.day,
+        );
+        final targetDate = DateTime(
+          startOfDay.year,
+          startOfDay.month,
+          startOfDay.day,
+        );
+
+        // For debugging, show collections from the past 7 days to today + 7 days
+        final isInDateRange =
+            collectionDate.isAfter(
+              targetDate.subtract(const Duration(days: 7)),
+            ) &&
+            collectionDate.isBefore(targetDate.add(const Duration(days: 7)));
+        print(
+          'Collection ${collection.id}: collectionDate=$collectionDate, targetDate=$targetDate, isInDateRange=$isInDateRange',
+        );
+        return isInDateRange;
       }).toList();
+
+      print('After date filtering: ${collections.length} collections');
 
       // Filter collections based on user role and area
       List<WasteCollection> filteredCollections = _filterCollectionsByRole(
@@ -218,6 +253,15 @@ class RouteOptimizationService {
         userRole,
         userId,
       );
+
+      print(
+        'After role filtering: ${filteredCollections.length} collections for user $userId',
+      );
+      for (var collection in filteredCollections) {
+        print(
+          'Final collection: ${collection.id}, assignedTo=${collection.assignedTo}',
+        );
+      }
 
       // Optimize route
       return await optimizeRoute(
@@ -240,9 +284,18 @@ class RouteOptimizationService {
       case UserRole.driver:
       case UserRole.collector:
         // Get collections assigned to this user
-        return collections.where((collection) {
-          return collection.assignedTo == userId;
+        print('Filtering for driver/collector: $userId');
+        final driverCollections = collections.where((collection) {
+          final isAssigned = collection.assignedTo == userId;
+          print(
+            'Collection ${collection.id}: assignedTo=${collection.assignedTo}, userId=$userId, isAssigned=$isAssigned',
+          );
+          return isAssigned;
         }).toList();
+        print(
+          'Found ${driverCollections.length} collections assigned to driver $userId',
+        );
+        return driverCollections;
       case UserRole.barangayOfficial:
         // Get collections in their barangay
         return collections.where((collection) {
@@ -471,12 +524,4 @@ class RouteOptimizationService {
       return [];
     }
   }
-}
-
-// Helper class for LatLng
-class LatLng {
-  final double latitude;
-  final double longitude;
-
-  const LatLng(this.latitude, this.longitude);
 }

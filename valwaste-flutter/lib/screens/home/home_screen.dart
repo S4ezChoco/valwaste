@@ -10,8 +10,9 @@ import '../schedule/driver_schedule_screen.dart';
 import '../profile/profile_screen.dart';
 import '../collection/collection_request_screen.dart';
 import '../map/map_screen.dart';
+import '../barangay/approval_screen.dart';
+import '../driver/driver_collections_screen.dart';
 import '../guide/recycling_guide_screen.dart';
-import '../history/history_screen.dart';
 import '../report/driver_report_screen.dart';
 import 'resident_dashboard_screen.dart';
 import 'barangay_official_dashboard_screen.dart';
@@ -94,30 +95,30 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (currentUser.role) {
       case UserRole.resident:
         print('HomeScreen: Initializing Resident dashboard');
-        // Resident features: Home, Schedule, History, Profile
+        // Resident features: Home, Schedule, Maps, Profile
         _screens = [
           const ResidentDashboardScreen(),
           const ScheduleScreen(), // Schedule tab for viewing schedules and requesting collections
-          const HistoryScreen(), // History tab for collection history and reports
+          const MapScreen(), // Maps tab for viewing collection routes and locations
           const ProfileScreen(),
         ];
         break;
       case UserRole.barangayOfficial:
         print('HomeScreen: Initializing Barangay Official dashboard');
-        // Barangay Official features: Home, Report, Maps, Profile
+        // Barangay Official features: Home, Approval, Maps, Profile
         _screens = [
           const BarangayOfficialDashboardScreen(),
-          const BarangayScheduleScreen(), // Using Schedule as Report for now
+          const ApprovalScreen(), // New approval screen for managing requests
           const MapScreen(), // Maps tab
           const ProfileScreen(),
         ];
         break;
       case UserRole.driver:
         print('HomeScreen: Initializing Driver dashboard');
-        // Driver features: Maps, Schedule, Reports, Profile
+        // Driver features: Maps, Collections, Reports, Profile
         _screens = [
           const MapScreen(), // Maps tab is now the home
-          const DriverScheduleScreen(), // Schedule tab - shows actual assigned collections
+          const DriverCollectionsScreen(), // New collections screen for assigned tasks
           const DriverReportScreen(), // Reports tab - shows collection completion reports
           const ProfileScreen(),
         ];
@@ -147,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _screens = [
           const ResidentDashboardScreen(),
           const ScheduleScreen(), // Schedule tab
-          const HistoryScreen(), // History tab
+          const MapScreen(), // Maps tab
           const ProfileScreen(),
         ];
         break;
@@ -174,14 +175,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final currentUser = FirebaseAuthService.currentUser;
     if (currentUser == null) return false;
 
-    // Map is at index 0 for driver, index 2 for other roles except resident
-    if (currentUser.role == UserRole.resident) {
-      return false; // Resident doesn't have Maps tab
-    }
+    // Map is at index 0 for driver, index 2 for other roles including resident
     if (currentUser.role == UserRole.driver) {
       return _currentIndex == 0; // Map is still the first tab for driver
     }
-    return _currentIndex == 2; // Map is at index 2 for other roles
+    return _currentIndex ==
+        2; // Map is at index 2 for other roles including resident
   }
 
   List<BottomNavigationBarItem> _getBottomNavItems() {
@@ -211,9 +210,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Schedule',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.history_outlined),
-            activeIcon: Icon(Icons.history),
-            label: 'History',
+            icon: Icon(Icons.map_outlined),
+            activeIcon: Icon(Icons.map),
+            label: 'Maps',
           ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
@@ -230,9 +229,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Home',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.assignment_outlined),
-            activeIcon: Icon(Icons.assignment),
-            label: 'Report',
+            icon: Icon(Icons.approval_outlined),
+            activeIcon: Icon(Icons.approval),
+            label: 'Approvals',
           ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.map_outlined),
@@ -254,9 +253,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Maps',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today_outlined),
-            activeIcon: Icon(Icons.calendar_today),
-            label: 'Schedule',
+            icon: Icon(Icons.assignment_outlined),
+            activeIcon: Icon(Icons.assignment),
+            label: 'Collections',
           ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.assessment_outlined),

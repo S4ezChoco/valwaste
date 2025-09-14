@@ -1,10 +1,11 @@
 enum CollectionStatus {
-  pending,
-  approved,
-  scheduled,
-  inProgress,
-  completed,
-  cancelled,
+  pending, // Resident submitted, waiting for barangay approval
+  approved, // Barangay official approved, waiting for admin scheduling
+  scheduled, // Admin scheduled for collection
+  inProgress, // Driver is collecting
+  completed, // Collection completed
+  cancelled, // Request cancelled
+  rejected, // Barangay official rejected
 }
 
 enum WasteType { general, recyclable, organic, hazardous, electronic }
@@ -27,6 +28,12 @@ class WasteCollection {
   final String? assignedTo;
   final String? assignedRole;
   final DateTime? assignedAt;
+  final String? approvedBy; // Barangay official who approved
+  final DateTime? approvedAt; // When it was approved
+  final String? scheduledBy; // Admin who scheduled
+  final DateTime? scheduledAt; // When it was scheduled
+  final String? rejectionReason; // Reason for rejection
+  final String? barangay; // Barangay where request was made
 
   WasteCollection({
     required this.id,
@@ -46,6 +53,12 @@ class WasteCollection {
     this.assignedTo,
     this.assignedRole,
     this.assignedAt,
+    this.approvedBy,
+    this.approvedAt,
+    this.scheduledBy,
+    this.scheduledAt,
+    this.rejectionReason,
+    this.barangay,
   });
 
   factory WasteCollection.fromJson(Map<String, dynamic> json) {
@@ -81,6 +94,16 @@ class WasteCollection {
       assignedAt: json['assigned_at'] != null
           ? DateTime.parse(json['assigned_at'])
           : null,
+      approvedBy: json['approved_by'],
+      approvedAt: json['approved_at'] != null
+          ? DateTime.parse(json['approved_at'])
+          : null,
+      scheduledBy: json['scheduled_by'],
+      scheduledAt: json['scheduled_at'] != null
+          ? DateTime.parse(json['scheduled_at'])
+          : null,
+      rejectionReason: json['rejection_reason'],
+      barangay: json['barangay'],
     );
   }
 
@@ -103,6 +126,12 @@ class WasteCollection {
       'assigned_to': assignedTo,
       'assigned_role': assignedRole,
       'assigned_at': assignedAt?.toIso8601String(),
+      'approved_by': approvedBy,
+      'approved_at': approvedAt?.toIso8601String(),
+      'scheduled_by': scheduledBy,
+      'scheduled_at': scheduledAt?.toIso8601String(),
+      'rejection_reason': rejectionReason,
+      'barangay': barangay,
     };
   }
 
@@ -111,15 +140,17 @@ class WasteCollection {
       case CollectionStatus.pending:
         return 'Pending Approval';
       case CollectionStatus.approved:
-        return 'Approved';
+        return 'Approved by Barangay';
       case CollectionStatus.scheduled:
-        return 'Scheduled';
+        return 'Scheduled for Collection';
       case CollectionStatus.inProgress:
         return 'In Progress';
       case CollectionStatus.completed:
         return 'Completed';
       case CollectionStatus.cancelled:
         return 'Cancelled';
+      case CollectionStatus.rejected:
+        return 'Rejected';
     }
   }
 

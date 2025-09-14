@@ -136,6 +136,12 @@
                                                 <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
                                             </svg>
                                         </button>
+                                        <button class="refresh-icon-btn" onclick="createTestApprovedCollection()" title="Create Test Collection" style="margin-left: 5px; background: #28a745; color: white;">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                        </button>
                                     </th>
                                 </tr>
                             </thead>
@@ -220,6 +226,70 @@
                 <div class="um-modal-actions report-actions" id="report-modal-actions">
                     <!-- Actions will be populated based on report status -->
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Schedule Modal -->
+    <div class="um-modal sched-modal" id="create-schedule-modal" style="display: none;">
+        <div class="um-modal-card large sched-modal-card" role="dialog" aria-modal="true" aria-labelledby="sched-title">
+            <button class="um-modal-close" aria-label="Close" onclick="closeCreateModal()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+
+            <h3 id="sched-title" class="um-modal-title">Schedule Collection</h3>
+            <p class="um-modal-sub">Fill details to schedule the collection</p>
+
+            <form id="createScheduleForm" class="um-form sched-modal-scroll">
+                <label class="um-field">
+                    <span class="um-label">Select Truck</span>
+                    <div class="um-select-wrap">
+                        <select class="um-select" id="truck-select" required>
+                            <option value="" disabled selected>Select Truck</option>
+                            <!-- Trucks will be loaded from Firebase -->
+                        </select>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="um-select-caret">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                </label>
+
+                <label class="um-field">
+                    <span class="um-label">Date</span>
+                    <input type="date" class="um-input" id="schedule-date" required>
+                </label>
+
+                <div class="um-row-2">
+                    <label class="um-field">
+                        <span class="um-label">Start</span>
+                        <input type="time" class="um-input" id="start-time" value="08:00" required>
+                    </label>
+                    <label class="um-field">
+                        <span class="um-label">End</span>
+                        <input type="time" class="um-input" id="end-time" value="16:00" required>
+                    </label>
+                </div>
+
+                <label class="um-field">
+                    <span class="um-label">Driver</span>
+                    <div class="um-select-wrap">
+                        <select class="um-select" id="driver-select" required>
+                            <option value="" disabled selected>Select Driver</option>
+                            <!-- Drivers will be loaded from Firebase -->
+                        </select>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="um-select-caret">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                </label>
+            </form>
+
+            <div class="sched-modal-actions">
+                <button type="button" class="btn-ghost" onclick="closeCreateModal()">Cancel</button>
+                <button type="submit" form="createScheduleForm" class="btn-primary">Schedule Collection</button>
             </div>
         </div>
     </div>

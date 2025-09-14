@@ -38,6 +38,7 @@ class FirebaseCollectionService {
         status: CollectionStatus.pending,
         createdAt: DateTime.now(),
         notes: notes,
+        barangay: FirebaseAuthService.currentUser!.barangay,
       );
 
       await _firestore
@@ -92,20 +93,50 @@ class FirebaseCollectionService {
   static Future<List<WasteCollection>> getUserCollections() async {
     try {
       if (FirebaseAuthService.currentUser == null) {
+        print('❌ No current user for getUserCollections');
         return [];
+      }
+
+      final userId = FirebaseAuthService.currentUser!.id;
+      print('🔍 Fetching collections for user: $userId');
+      print('🔍 User ID type: ${userId.runtimeType}');
+      print('🔍 User ID length: ${userId.length}');
+
+      // First, let's check all collections to see what's in the database
+      final allCollectionsSnapshot = await _firestore
+          .collection('collections')
+          .get();
+
+      print(
+        '📄 Total collections in database: ${allCollectionsSnapshot.docs.length}',
+      );
+
+      for (var doc in allCollectionsSnapshot.docs) {
+        final data = doc.data();
+        print(
+          '📋 Collection ${doc.id}: user_id = "${data['user_id']}" (type: ${data['user_id'].runtimeType})',
+        );
       }
 
       final querySnapshot = await _firestore
           .collection('collections')
-          .where('user_id', isEqualTo: FirebaseAuthService.currentUser!.id)
+          .where('user_id', isEqualTo: userId)
           .orderBy('created_at', descending: true)
           .get();
 
-      return querySnapshot.docs
-          .map((doc) => WasteCollection.fromJson(doc.data()))
-          .toList();
+      print(
+        '📄 Found ${querySnapshot.docs.length} collection documents for this user',
+      );
+
+      final collections = querySnapshot.docs.map((doc) {
+        print('📋 Collection: ${doc.id} - ${doc.data()}');
+        return WasteCollection.fromJson(doc.data());
+      }).toList();
+
+      print('✅ Successfully loaded ${collections.length} collections');
+      return collections;
     } catch (e) {
-      print('Error fetching user collections: $e');
+      print('❌ Error fetching user collections: $e');
       return [];
     }
   }
@@ -236,6 +267,7 @@ class FirebaseCollectionService {
   static Future<Map<String, dynamic>> getUserCollectionStats() async {
     try {
       if (FirebaseAuthService.currentUser == null) {
+        print('❌ No current user for getUserCollectionStats');
         return {
           'totalCollections': 0,
           'completedCollections': 0,
@@ -244,6 +276,9 @@ class FirebaseCollectionService {
         };
       }
 
+      print(
+        '📊 Calculating stats for user: ${FirebaseAuthService.currentUser!.id}',
+      );
       final collections = await getUserCollections();
 
       int totalCollections = collections.length;
@@ -261,14 +296,17 @@ class FirebaseCollectionService {
           .where((c) => c.status == CollectionStatus.completed)
           .fold(0.0, (sum, c) => sum + c.quantity);
 
-      return {
+      final stats = {
         'totalCollections': totalCollections,
         'completedCollections': completedCollections,
         'pendingCollections': pendingCollections,
         'totalWeight': totalWeight,
       };
+
+      print('📈 Calculated stats: $stats');
+      return stats;
     } catch (e) {
-      print('Error fetching collection stats: $e');
+      print('❌ Error fetching collection stats: $e');
       return {
         'totalCollections': 0,
         'completedCollections': 0,

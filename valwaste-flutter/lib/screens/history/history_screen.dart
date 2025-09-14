@@ -563,6 +563,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
         statusColor = Colors.red;
         statusIcon = Icons.cancel;
         break;
+      case CollectionStatus.rejected:
+        statusColor = Colors.red;
+        statusIcon = Icons.cancel;
+        break;
     }
 
     return Padding(

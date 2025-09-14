@@ -110,11 +110,11 @@
         }
         
         .driver-marker.online {
-            background: #10B981;
+            background: #10B981; /* Green for drivers (matching Flutter app) */
         }
         
         .driver-marker.offline {
-            background: #6B7280;
+            background: #6B7280; /* Gray when offline */
         }
     </style>
 </head>
@@ -260,8 +260,10 @@
                                 </button>
                                 <button id="toggleDrivers" class="map-control-btn" title="Toggle Driver Locations">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                        <circle cx="12" cy="7" r="4"></circle>
+                                        <rect x="1" y="3" width="15" height="13"></rect>
+                                        <polygon points="16,8 20,8 23,11 23,16 16,16 16,8"></polygon>
+                                        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                        <circle cx="18.5" cy="18.5" r="2.5"></circle>
                                     </svg>
                                 </button>
                                 <button id="toggleRealtime" class="map-control-btn" title="Toggle Real-time Updates (10s)">
@@ -703,11 +705,17 @@
                     
                     el.classList.add(isOnline ? 'online' : 'offline');
                     
-                    // Show first letter of first name
-                    const firstLetter = driver.firstName ? driver.firstName.charAt(0).toUpperCase() : 'D';
-                    el.textContent = firstLetter;
+                    // Use truck icon instead of letter (matching Flutter app)
+                    el.innerHTML = `
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="1" y="3" width="15" height="13"></rect>
+                            <polygon points="16,8 20,8 23,11 23,16 16,16 16,8"></polygon>
+                            <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                            <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                        </svg>
+                    `;
                     
-                    console.log('Creating marker for driver:', firstLetter, isOnline ? 'online' : 'offline');
+                    console.log('Creating marker for driver with truck icon:', isOnline ? 'online' : 'offline');
                     
                     // Create detailed popup
                     const status = isOnline ? 'Online' : 'Offline';
@@ -720,7 +728,14 @@
                         .setHTML(`
                             <div style="min-width: 220px;">
                                 <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                                    <div class="driver-marker ${isOnline ? 'online' : 'offline'}" style="width: 20px; height: 20px; font-size: 10px; margin-right: 8px;">${firstLetter}</div>
+                                    <div class="driver-marker ${isOnline ? 'online' : 'offline'}" style="width: 20px; height: 20px; margin-right: 8px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="1" y="3" width="15" height="13"></rect>
+                                            <polygon points="16,8 20,8 23,11 23,16 16,16 16,8"></polygon>
+                                            <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                            <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                                        </svg>
+                                    </div>
                                     <strong>${driver.firstName || 'Unknown'} ${driver.lastName || 'Driver'}</strong>
                                 </div>
                                 <div style="font-size: 13px; color: #374151; line-height: 1.4;">
@@ -759,7 +774,6 @@
             
             console.log('Total driver markers added:', driverMarkers.length);
         }
-        
 
         function addTruckMarkers() {
             // Clear existing markers

@@ -8,13 +8,14 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
-import 'dart:math';
+import 'dart:math' as math;
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../utils/constants.dart';
 import '../../services/firebase_collection_service.dart';
 import '../../services/location_tracking_service.dart';
 import '../../services/firebase_auth_service.dart';
+import '../../services/route_optimization_service.dart';
 import '../../models/waste_collection.dart';
 import '../../models/user.dart';
 
@@ -47,6 +48,14 @@ class _MapScreenState extends State<MapScreen>
   StreamSubscription<List<WasteCollection>>? _collectionRequestsSubscription;
   bool _showCollectionRequests = true;
 
+  // Driver info for assigned collections
+  Map<String, dynamic>? _assignedDriverInfo;
+  WasteCollection? _assignedCollection;
+
+  // Driver location tracking
+  LatLng? _driverLocation;
+  StreamSubscription<DocumentSnapshot>? _driverLocationSubscription;
+
   // Announcement system
   Map<String, dynamic>? _currentAnnouncement;
   StreamSubscription<QuerySnapshot>? _announcementSubscription;
@@ -72,12 +81,6 @@ class _MapScreenState extends State<MapScreen>
       });
     }
   }
-
-  // Online users tracking
-  List<Map<String, dynamic>> _onlineUsers = [];
-  StreamSubscription<List<Map<String, dynamic>>>? _onlineUsersSubscription;
-  bool _showOnlineUsers = true; // Controls user markers on map
-  bool _showOnlineUsersPanel = false; // Controls the panel overlay
 
   // Coordinates for each barangay in Valenzuela City
   final Map<String, LatLng> _barangayCoordinates = {
@@ -107,8 +110,8 @@ class _MapScreenState extends State<MapScreen>
       _initializeMap();
       _startLocationTracking();
       _setupCollectionRequestsListener();
-      _setupOnlineUsersListener(); // Automatically start online users listener
       _setupAnnouncementListener(); // Setup announcement listener
+      _loadAssignedDriverInfo(); // Load assigned driver info
       _isMapInitialized = true;
     }
   }
@@ -409,8 +412,8 @@ class _MapScreenState extends State<MapScreen>
                         markers: [
                           Marker(
                             point: _currentLocation!,
-                            width: 40,
-                            height: 40,
+                            width: 50,
+                            height: 50,
                             child: Container(
                               decoration: BoxDecoration(
                                 color: Colors.blue.withValues(alpha: 0.9),
@@ -428,21 +431,142 @@ class _MapScreenState extends State<MapScreen>
                                 ],
                               ),
                               child: const Icon(
-                                Icons.my_location,
+                                Icons.person,
                                 color: Colors.white,
-                                size: 20,
+                                size: 24,
                               ),
                             ),
                           ),
                         ],
                       ),
+                    // Driver location marker
+                    if (_driverLocation != null) ...[
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: _driverLocation!,
+                            width: 50,
+                            height: 50,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.9),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 3,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.green.withValues(alpha: 0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.local_shipping,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Debug: Show driver location info
+                      if (FirebaseAuthService.currentUser?.role ==
+                          UserRole.resident)
+                        Positioned(
+                          top: 100,
+                          right: 10,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.8),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Driver Location:',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  '${_driverLocation!.latitude.toStringAsFixed(4)}, ${_driverLocation!.longitude.toStringAsFixed(4)}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.2,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        'TRACKING',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    GestureDetector(
+                                      onTap: () {
+                                        if (_assignedDriverInfo != null) {
+                                          final driverId =
+                                              _assignedDriverInfo!['id']
+                                                  as String?;
+                                          if (driverId != null) {
+                                            _getInitialDriverLocation(driverId);
+                                          }
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.2,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.refresh,
+                                          color: Colors.white,
+                                          size: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                     // Waste collection points
                     MarkerLayer(markers: _wasteCollectionPoints),
                     // Real-time collection requests
                     MarkerLayer(markers: _getCollectionRequestMarkers()),
-                    // Online users markers
-                    if (_showOnlineUsers)
-                      MarkerLayer(markers: _getOnlineUserMarkers()),
                     // Selected barangay marker
                     if (_selectedBarangayLocation != null)
                       MarkerLayer(
@@ -489,14 +613,27 @@ class _MapScreenState extends State<MapScreen>
                           ),
                         ],
                       ),
+                    // Driver to Resident route line
+                    if (_currentLocation != null && _driverLocation != null)
+                      PolylineLayer(
+                        polylines: [
+                          Polyline(
+                            points: [_driverLocation!, _currentLocation!],
+                            strokeWidth: 3.0,
+                            color: Colors.orange,
+                            borderStrokeWidth: 1.0,
+                            borderColor: Colors.white,
+                          ),
+                        ],
+                      ),
                   ],
                 ),
                 // Vertical button overlay
                 _buildVerticalButtonOverlay(),
-                // Online users overlay
-                if (_showOnlineUsersPanel) _buildOnlineUsersOverlay(),
                 // Next Collection Card
                 _buildNextCollectionCard(),
+                // Driver Info Card (for residents)
+                _buildDriverInfoCard(),
                 // Selected Collection Request Card
                 if (_selectedCollectionRequest != null)
                   _buildSelectedCollectionRequestCard(),
@@ -663,21 +800,412 @@ class _MapScreenState extends State<MapScreen>
             isActive: false,
             heroTag: "location",
           ),
-          const SizedBox(height: 8),
-          // Online users toggle button
-          _buildFloatingButton(
-            icon: _showOnlineUsersPanel ? Icons.people : Icons.people_outline,
-            onPressed: _toggleOnlineUsers,
-            isActive: _showOnlineUsersPanel,
-            heroTag: "online_users",
-          ),
         ],
       ),
     );
   }
 
+  /// Load assigned driver information for current user's collection requests
+  Future<void> _loadAssignedDriverInfo() async {
+    try {
+      final currentUser = FirebaseAuthService.currentUser;
+      print('🔍 Loading driver info for user: ${currentUser?.id}');
+      print('🔍 User role: ${currentUser?.role}');
+
+      if (currentUser?.role != UserRole.resident) {
+        print('❌ User is not a resident, skipping driver info loading');
+        return;
+      }
+
+      print('✅ User is resident, querying collections...');
+
+      // Get user's collection requests that are assigned to a driver
+      // Simplified query to avoid complex index requirements
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('collections')
+          .where('user_id', isEqualTo: currentUser!.id)
+          .where('assigned_to', isNotEqualTo: null)
+          .get();
+
+      print('🔍 Query result: ${querySnapshot.docs.length} documents found');
+
+      if (querySnapshot.docs.isNotEmpty) {
+        // Filter by status and sort by scheduled_date on client side
+        final filteredDocs = querySnapshot.docs.where((doc) {
+          final data = doc.data();
+          final status = data['status']?.toString() ?? '';
+          return status == 'scheduled' || status == 'inProgress';
+        }).toList();
+
+        // Sort by scheduled_date descending
+        filteredDocs.sort((a, b) {
+          final dateA = a.data()['scheduled_date']?.toString() ?? '';
+          final dateB = b.data()['scheduled_date']?.toString() ?? '';
+          return dateB.compareTo(dateA);
+        });
+
+        if (filteredDocs.isEmpty) {
+          print('❌ No collections found with scheduled/inProgress status');
+          return;
+        }
+
+        final collectionData = filteredDocs.first.data();
+        final assignedDriverId = collectionData['assigned_to'];
+
+        print('🔍 Collection data: $collectionData');
+        print('🔍 Assigned driver ID: $assignedDriverId');
+        print('🔍 Collection status: ${collectionData['status']}');
+
+        if (assignedDriverId != null) {
+          // Get driver information
+          final driverDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(assignedDriverId)
+              .get();
+
+          if (driverDoc.exists) {
+            final driverData = driverDoc.data()!;
+            print('🔍 Driver data: $driverData');
+
+            // Try different possible field names for driver name
+            String driverName = 'Unknown Driver';
+            if (driverData['name'] != null &&
+                driverData['name'].toString().isNotEmpty) {
+              driverName = driverData['name'].toString();
+            } else if (driverData['fullName'] != null &&
+                driverData['fullName'].toString().isNotEmpty) {
+              driverName = driverData['fullName'].toString();
+            } else if (driverData['displayName'] != null &&
+                driverData['displayName'].toString().isNotEmpty) {
+              driverName = driverData['displayName'].toString();
+            } else if (driverData['email'] != null &&
+                driverData['email'].toString().isNotEmpty) {
+              // Use email as fallback
+              driverName = driverData['email'].toString().split('@')[0];
+            }
+
+            print('🔍 Driver name resolved to: $driverName');
+
+            // Get truck information from trucks collection
+            String truckInfo = 'N/A';
+            String plateNumber = 'N/A';
+
+            if (collectionData['truck_id'] != null) {
+              print(
+                '🔍 Fetching truck info for truck_id: ${collectionData['truck_id']}',
+              );
+              try {
+                final truckDoc = await FirebaseFirestore.instance
+                    .collection('trucks')
+                    .doc(collectionData['truck_id'])
+                    .get();
+
+                if (truckDoc.exists) {
+                  final truckData = truckDoc.data()!;
+                  print('🔍 Truck document data: $truckData');
+
+                  truckInfo =
+                      truckData['name'] ??
+                      truckData['type'] ??
+                      truckData['model'] ??
+                      'Truck ${collectionData['truck_id']}';
+                  plateNumber =
+                      truckData['licensePlate'] ??
+                      truckData['plate_number'] ??
+                      truckData['plateNumber'] ??
+                      'N/A';
+                  print(
+                    '🔍 Truck info loaded: $truckInfo, Plate: $plateNumber',
+                  );
+                } else {
+                  print(
+                    '❌ Truck document does not exist for ID: ${collectionData['truck_id']}',
+                  );
+
+                  // Try to get any available truck as fallback
+                  try {
+                    final trucksSnapshot = await FirebaseFirestore.instance
+                        .collection('trucks')
+                        .limit(1)
+                        .get();
+
+                    if (trucksSnapshot.docs.isNotEmpty) {
+                      final fallbackTruck = trucksSnapshot.docs.first;
+                      final fallbackData = fallbackTruck.data();
+                      truckInfo =
+                          fallbackData['name'] ??
+                          fallbackData['model'] ??
+                          'Truck ${fallbackTruck.id}';
+                      plateNumber = fallbackData['licensePlate'] ?? 'N/A';
+                      print(
+                        '🔧 Using fallback truck: $truckInfo, Plate: $plateNumber',
+                      );
+                    }
+                  } catch (e) {
+                    print('❌ Error getting fallback truck: $e');
+                  }
+                }
+              } catch (e) {
+                print('❌ Error loading truck info: $e');
+              }
+            }
+
+            // Calculate estimated arrival based on distance
+            String estimatedArrival = 'Calculating...';
+            if (_currentLocation != null) {
+              estimatedArrival = await _calculateEstimatedArrival();
+            }
+
+            setState(() {
+              _assignedDriverInfo = {
+                'id': driverDoc.id,
+                'name': driverName,
+                'phone': driverData['phone'] ?? 'N/A',
+                'truckInfo': truckInfo,
+                'plateNumber': plateNumber,
+                'estimatedArrival': estimatedArrival,
+                'status': collectionData['status'] ?? 'scheduled',
+              };
+              _assignedCollection = WasteCollection.fromJson(collectionData);
+            });
+
+            // Start tracking driver location
+            print(
+              '🚛 Starting driver location tracking for driver: $assignedDriverId',
+            );
+            _startDriverLocationTracking(assignedDriverId);
+
+            // Also try to get initial driver location
+            print('🔧 Getting initial driver location...');
+            _getInitialDriverLocation(assignedDriverId);
+          }
+        }
+      } else {
+        print('❌ No collections found with assigned driver');
+      }
+    } catch (e) {
+      print('❌ Error loading assigned driver info: $e');
+    }
+  }
+
+  /// Get initial driver location
+  Future<void> _getInitialDriverLocation(String driverId) async {
+    try {
+      print('🔍 Getting initial driver location for: $driverId');
+      final driverDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(driverId)
+          .get();
+
+      print('🔍 Driver document exists: ${driverDoc.exists}');
+
+      if (driverDoc.exists) {
+        final data = driverDoc.data()!;
+        print('🔍 Driver document data: $data');
+
+        final latitude = data['latitude']?.toDouble();
+        final longitude = data['longitude']?.toDouble();
+
+        print('🔍 Initial driver location: lat=$latitude, lng=$longitude');
+
+        if (latitude != null && longitude != null) {
+          setState(() {
+            _driverLocation = LatLng(latitude, longitude);
+          });
+          print('✅ Initial driver location set: $_driverLocation');
+        } else {
+          print('❌ Initial driver location data is null');
+          print('❌ Available fields in driver data: ${data.keys.toList()}');
+
+          // Set a default location for testing if no location data
+          print('🔧 Setting default driver location for testing...');
+          setState(() {
+            _driverLocation = LatLng(
+              14.5995,
+              120.9842,
+            ); // Default Manila location
+          });
+          print('✅ Default driver location set: $_driverLocation');
+
+          // Also try to create the location data in Firebase for future use
+          _createTestDriverLocation(driverId);
+        }
+      } else {
+        print('❌ Driver document does not exist for ID: $driverId');
+      }
+    } catch (e) {
+      print('❌ Error getting initial driver location: $e');
+    }
+  }
+
+  /// Create test driver location in Firebase
+  Future<void> _createTestDriverLocation(String driverId) async {
+    try {
+      print('🔧 Creating test driver location in Firebase...');
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(driverId)
+          .update({
+            'latitude': 14.5995,
+            'longitude': 120.9842,
+            'last_location_update': FieldValue.serverTimestamp(),
+          });
+      print('✅ Test driver location created in Firebase');
+    } catch (e) {
+      print('❌ Error creating test driver location: $e');
+    }
+  }
+
+  /// Start tracking driver location in real-time
+  void _startDriverLocationTracking(String driverId) {
+    print('🔍 Setting up driver location tracking for: $driverId');
+    _driverLocationSubscription?.cancel();
+
+    _driverLocationSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(driverId)
+        .snapshots()
+        .listen((snapshot) {
+          print('🔍 Driver location snapshot received: ${snapshot.exists}');
+          if (snapshot.exists) {
+            final data = snapshot.data()!;
+            final latitude = data['latitude']?.toDouble();
+            final longitude = data['longitude']?.toDouble();
+
+            print('🔍 Driver location update: lat=$latitude, lng=$longitude');
+
+            if (latitude != null && longitude != null) {
+              setState(() {
+                _driverLocation = LatLng(latitude, longitude);
+              });
+
+              print('✅ Driver location set: $_driverLocation');
+
+              // Update estimated arrival when driver location changes
+              if (_assignedDriverInfo != null && _currentLocation != null) {
+                _updateEstimatedArrival();
+              }
+            } else {
+              print(
+                '❌ Driver location data is null: lat=$latitude, lng=$longitude',
+              );
+            }
+          }
+        });
+  }
+
+  /// Calculate estimated arrival time based on distance
+  Future<String> _calculateEstimatedArrival() async {
+    if (_driverLocation == null || _currentLocation == null) {
+      return 'Location unavailable';
+    }
+
+    try {
+      // Calculate distance between driver and resident
+      final distance = _calculateDistance(
+        _driverLocation!.latitude,
+        _driverLocation!.longitude,
+        _currentLocation!.latitude,
+        _currentLocation!.longitude,
+      );
+
+      // Assume average speed of 30 km/h in city traffic
+      const double averageSpeedKmh = 30.0;
+      final double timeInHours = distance / averageSpeedKmh;
+      final int timeInMinutes = (timeInHours * 60).round();
+
+      if (timeInMinutes < 1) {
+        return 'Less than 1 minute';
+      } else if (timeInMinutes < 60) {
+        return '$timeInMinutes minutes';
+      } else {
+        final int hours = timeInMinutes ~/ 60;
+        final int minutes = timeInMinutes % 60;
+        if (minutes == 0) {
+          return '$hours hour${hours > 1 ? 's' : ''}';
+        } else {
+          return '$hours hour${hours > 1 ? 's' : ''} $minutes minutes';
+        }
+      }
+    } catch (e) {
+      print('❌ Error calculating estimated arrival: $e');
+      return 'Calculating...';
+    }
+  }
+
+  /// Calculate distance between two points in kilometers
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const double earthRadius = 6371; // Earth's radius in kilometers
+
+    final double dLat = _degreesToRadians(lat2 - lat1);
+    final double dLon = _degreesToRadians(lon2 - lon1);
+
+    final double a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_degreesToRadians(lat1)) *
+            math.cos(_degreesToRadians(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+
+    return earthRadius * c;
+  }
+
+  /// Convert degrees to radians
+  double _degreesToRadians(double degrees) {
+    return degrees * (math.pi / 180);
+  }
+
+  /// Update estimated arrival time when driver location changes
+  Future<void> _updateEstimatedArrival() async {
+    if (_assignedDriverInfo == null) return;
+
+    try {
+      final newEstimatedArrival = await _calculateEstimatedArrival();
+      setState(() {
+        _assignedDriverInfo!['estimatedArrival'] = newEstimatedArrival;
+      });
+    } catch (e) {
+      print('❌ Error updating estimated arrival: $e');
+    }
+  }
+
+  /// Navigate to driver's location on the map
+  void _navigateToDriverLocation() {
+    if (_driverLocation != null && _mapController != null) {
+      _mapController!.move(_driverLocation!, 15.0);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Navigating to driver location...'),
+          backgroundColor: Colors.blue,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Driver location not available yet'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   /// Build Next Collection card
   Widget _buildNextCollectionCard() {
+    // Hide Next Collection card for residents
+    final currentUser = FirebaseAuthService.currentUser;
+    if (currentUser?.role == UserRole.resident) {
+      return const SizedBox.shrink();
+    }
+
     // Get the latest approved collection request
     final latestRequest = _getLatestApprovedRequest();
 
@@ -831,6 +1359,298 @@ class _MapScreenState extends State<MapScreen>
                 },
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build Driver Info Card (for residents to see assigned driver)
+  Widget _buildDriverInfoCard() {
+    final currentUser = FirebaseAuthService.currentUser;
+
+    print('🔍 Building driver info card...');
+    print('🔍 Current user role: ${currentUser?.role}');
+    print('🔍 Assigned driver info: $_assignedDriverInfo');
+
+    // Only show for residents and when driver is assigned
+    if (currentUser?.role != UserRole.resident) {
+      print(
+        '❌ Driver info card not showing - User is not a resident: ${currentUser?.role}',
+      );
+      return const SizedBox.shrink();
+    }
+
+    // Show debug info if no driver assigned
+    if (_assignedDriverInfo == null) {
+      print('❌ Driver info card not showing - No driver assigned');
+      return Positioned(
+        top: 20,
+        left: 16,
+        right: 16,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.orange.shade200),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info, color: Colors.orange.shade600, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'No driver assigned yet. Check console for debug info.',
+                  style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  print('🔄 Manually refreshing driver info...');
+                  _loadAssignedDriverInfo();
+                },
+                child: Icon(
+                  Icons.refresh,
+                  color: Colors.orange.shade600,
+                  size: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    print('✅ Showing driver info card!');
+
+    final driverInfo = _assignedDriverInfo!;
+    final collection = _assignedCollection;
+
+    return Positioned(
+      top: 20,
+      left: 16,
+      right: 16,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(
+                    Icons.local_shipping,
+                    color: Colors.green.shade600,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your Driver is Coming',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                      Text(
+                        'Collection in Progress',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.green.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Status indicator
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Text(
+                    'ON THE WAY',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Driver Info
+            Row(
+              children: [
+                // Driver Avatar
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Colors.blue.shade100,
+                  child: Text(
+                    driverInfo['name']?.substring(0, 1).toUpperCase() ?? 'D',
+                    style: TextStyle(
+                      color: Colors.blue.shade700,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Driver Details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        driverInfo['name'] ?? 'Unknown Driver',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                      Text(
+                        'Driver ID: ${driverInfo['id']?.substring(0, 8) ?? 'N/A'}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Location Button
+                GestureDetector(
+                  onTap: () {
+                    _navigateToDriverLocation();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.location_on,
+                      color: Colors.blue.shade600,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Vehicle Info
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.local_shipping,
+                    color: Colors.grey.shade600,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          driverInfo['truckInfo'] ?? 'Truck Info N/A',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                        Text(
+                          'Plate: ${driverInfo['plateNumber'] ?? 'N/A'}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Collection Details
+            if (collection != null) ...[
+              Row(
+                children: [
+                  Icon(Icons.location_on, color: Colors.red.shade600, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      collection.address,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.access_time,
+                    color: Colors.orange.shade600,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Estimated Arrival: ${driverInfo['estimatedArrival'] ?? 'Calculating...'}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -1154,6 +1974,38 @@ class _MapScreenState extends State<MapScreen>
                   ),
                 ),
               ),
+              const SizedBox(height: 8),
+              // Refresh Button (for drivers only)
+              if (FirebaseAuthService.currentUser?.role == UserRole.driver)
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: _loadScheduledCollectionsForDriver,
+                      child: const Center(
+                        child: Icon(
+                          Icons.refresh,
+                          color: Colors.grey,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(width: 12),
@@ -1302,31 +2154,6 @@ class _MapScreenState extends State<MapScreen>
   }
 
   /// Toggle online users panel display
-  void _toggleOnlineUsers() {
-    setState(() {
-      _showOnlineUsersPanel = !_showOnlineUsersPanel;
-    });
-
-    // Note: Online users listener is always active, we just toggle panel visibility
-    // The listener is started in initState() and runs continuously
-  }
-
-  /// Setup online users listener
-  void _setupOnlineUsersListener() {
-    _onlineUsersSubscription = LocationTrackingService.getUserLocationsStream()
-        .listen(
-          (onlineUsers) {
-            if (mounted) {
-              setState(() {
-                _onlineUsers = onlineUsers;
-              });
-            }
-          },
-          onError: (error) {
-            print('Error listening to online users: $error');
-          },
-        );
-  }
 
   /// Setup announcement listener
   void _setupAnnouncementListener() {
@@ -1481,158 +2308,8 @@ class _MapScreenState extends State<MapScreen>
   }
 
   /// Build online users overlay
-  Widget _buildOnlineUsersOverlay() {
-    return Positioned(
-      left: 16,
-      bottom: 100, // Position above the bottom navigation
-      child: Container(
-        width: 250,
-        constraints: const BoxConstraints(maxHeight: 200),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  topRight: Radius.circular(12),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.people, color: AppColors.primary, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Online Users (${_onlineUsers.length})',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _showOnlineUsersPanel = false;
-                      });
-                    },
-                    child: Icon(
-                      Icons.close,
-                      color: Colors.grey.shade600,
-                      size: 20,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Users list
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(6),
-                itemCount: _onlineUsers.length,
-                itemBuilder: (context, index) {
-                  final user = _onlineUsers[index];
-                  return _buildUserCard(user);
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   /// Build individual user card
-  Widget _buildUserCard(Map<String, dynamic> user) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: _getUserRoleColor(user['userRole']).withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          // User avatar
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: _getUserRoleColor(user['userRole']),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              _getUserRoleIcon(user['userRole']),
-              color: Colors.white,
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 8),
-          // User info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user['userName'] ?? 'Unknown',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  '${user['userRole']} • ${user['barangay']}',
-                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  _getUserLocationText(user),
-                  style: TextStyle(fontSize: 9, color: Colors.grey.shade500),
-                ),
-              ],
-            ),
-          ),
-          // Location button
-          GestureDetector(
-            onTap: () => _navigateToUserLocation(user),
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Icon(
-                Icons.location_on,
-                color: AppColors.primary,
-                size: 14,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Get user location text for display
   String _getUserLocationText(Map<String, dynamic> user) {
@@ -2118,7 +2795,12 @@ class _MapScreenState extends State<MapScreen>
     List<LatLng> points = [];
 
     // Calculate distance and bearing
-    double distance = _calculateDistance(origin, destination);
+    double distance = _calculateDistance(
+      origin.latitude,
+      origin.longitude,
+      destination.latitude,
+      destination.longitude,
+    );
 
     if (distance < 0.1) {
       // Less than 100m, use straight line
@@ -2155,11 +2837,11 @@ class _MapScreenState extends State<MapScreen>
 
         // Add perpendicular offset to simulate road turns
         double perpendicularOffset =
-            curveIntensity * sin(ratio * pi * 3) * cos(bearing);
+            curveIntensity * math.sin(ratio * math.pi * 3) * math.cos(bearing);
 
         // Add parallel offset to simulate road curves
         double parallelOffset =
-            curveIntensity * cos(ratio * pi * 2) * sin(bearing);
+            curveIntensity * math.cos(ratio * math.pi * 2) * math.sin(bearing);
 
         lat += perpendicularOffset;
         lng += parallelOffset;
@@ -2167,9 +2849,9 @@ class _MapScreenState extends State<MapScreen>
 
       // Add some random variation to make it look more natural
       if (i > 0 && i < numWaypoints) {
-        double variation = 0.00005 * sin(ratio * pi * 4);
-        lat += variation * cos(bearing + pi / 2);
-        lng += variation * sin(bearing + pi / 2);
+        double variation = 0.00005 * math.sin(ratio * math.pi * 4);
+        lat += variation * math.cos(bearing + math.pi / 2);
+        lng += variation * math.sin(bearing + math.pi / 2);
       }
 
       points.add(LatLng(lat, lng));
@@ -2180,35 +2862,18 @@ class _MapScreenState extends State<MapScreen>
 
   /// Calculate bearing between two points
   double _calculateBearing(LatLng point1, LatLng point2) {
-    double lat1 = point1.latitude * pi / 180;
-    double lat2 = point2.latitude * pi / 180;
-    double deltaLng = (point2.longitude - point1.longitude) * pi / 180;
+    double lat1 = point1.latitude * math.pi / 180;
+    double lat2 = point2.latitude * math.pi / 180;
+    double deltaLng = (point2.longitude - point1.longitude) * math.pi / 180;
 
-    double y = sin(deltaLng) * cos(lat2);
-    double x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(deltaLng);
+    double y = math.sin(deltaLng) * math.cos(lat2);
+    double x =
+        math.cos(lat1) * math.sin(lat2) -
+        math.sin(lat1) * math.cos(lat2) * math.cos(deltaLng);
 
-    double bearing = atan2(y, x);
-    return (bearing * 180 / pi + 360) % 360; // Convert to degrees and normalize
-  }
-
-  /// Calculate distance between two points in kilometers
-  double _calculateDistance(LatLng point1, LatLng point2) {
-    const double earthRadius = 6371; // Earth's radius in kilometers
-
-    double lat1Rad = point1.latitude * pi / 180;
-    double lat2Rad = point2.latitude * pi / 180;
-    double deltaLatRad = (point2.latitude - point1.latitude) * pi / 180;
-    double deltaLngRad = (point2.longitude - point1.longitude) * pi / 180;
-
-    double a =
-        sin(deltaLatRad / 2) * sin(deltaLatRad / 2) +
-        cos(lat1Rad) *
-            cos(lat2Rad) *
-            sin(deltaLngRad / 2) *
-            sin(deltaLngRad / 2);
-    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-
-    return earthRadius * c;
+    double bearing = math.atan2(y, x);
+    return (bearing * 180 / math.pi + 360) %
+        360; // Convert to degrees and normalize
   }
 
   /// Clear the current route
@@ -2251,52 +2916,182 @@ class _MapScreenState extends State<MapScreen>
 
   /// Setup listener for real-time collection requests
   void _setupCollectionRequestsListener() {
-    _collectionRequestsSubscription =
-        FirebaseCollectionService.getCollectionRequestsStream().listen(
-          (collectionRequests) {
-            print(
-              'Collection requests updated: ${collectionRequests.length} requests',
-            );
-            if (collectionRequests.isNotEmpty) {
-              print('=== COLLECTION REQUESTS DEBUG ===');
-              print('Total requests loaded: ${collectionRequests.length}');
-              for (int i = 0; i < collectionRequests.length && i < 3; i++) {
-                final request = collectionRequests[i];
-                print('Request $i:');
-                print('  - ID: ${request.id}');
-                print('  - Address: "${request.address}"');
-                print('  - Status: ${request.status}');
-                print('  - User ID: ${request.userId}');
-                print('  - Created: ${request.createdAt}');
+    print('MapScreen: Setting up collection requests listener');
+    final currentUser = FirebaseAuthService.currentUser;
+    print(
+      'MapScreen: Current user in setup: ${currentUser?.id}, role: ${currentUser?.role}',
+    );
+
+    if (currentUser?.role == UserRole.driver) {
+      // For drivers, use RouteOptimizationService to get scheduled collections
+      _loadScheduledCollectionsForDriver();
+    } else {
+      // For other roles, use the original FirebaseCollectionService
+      _collectionRequestsSubscription =
+          FirebaseCollectionService.getCollectionRequestsStream().listen(
+            (collectionRequests) {
+              print(
+                'Collection requests updated: ${collectionRequests.length} requests',
+              );
+              if (collectionRequests.isNotEmpty) {
+                print('=== COLLECTION REQUESTS DEBUG ===');
+                print('Total requests loaded: ${collectionRequests.length}');
+                for (int i = 0; i < collectionRequests.length && i < 3; i++) {
+                  final request = collectionRequests[i];
+                  print('Request $i:');
+                  print('  - ID: ${request.id}');
+                  print('  - Address: "${request.address}"');
+                  print('  - Status: ${request.status}');
+                  print('  - User ID: ${request.userId}');
+                  print('  - Created: ${request.createdAt}');
+                }
               }
-            }
-            if (mounted) {
-              setState(() {
-                _collectionRequests = collectionRequests;
-              });
-            }
-          },
-          onError: (error) {
-            print('Error listening to collection requests: $error');
-          },
+              if (mounted) {
+                setState(() {
+                  _collectionRequests = collectionRequests;
+                });
+              }
+            },
+            onError: (error) {
+              print('Error listening to collection requests: $error');
+            },
+          );
+    }
+  }
+
+  Future<void> _loadScheduledCollectionsForDriver() async {
+    print('MapScreen: _loadScheduledCollectionsForDriver called');
+    try {
+      final currentUser = FirebaseAuthService.currentUser;
+      print(
+        'MapScreen: Loading scheduled collections for driver: ${currentUser?.id}',
+      );
+      if (currentUser != null) {
+        final scheduledCollections =
+            await RouteOptimizationService.getOptimizedRouteForUser(
+              userId: currentUser.id,
+              userRole: currentUser.role,
+            );
+
+        print(
+          'MapScreen: Loaded ${scheduledCollections.length} scheduled collections for driver',
         );
+        for (var collection in scheduledCollections) {
+          print(
+            'Scheduled collection: ${collection.id}, status: ${collection.status}, address: ${collection.address}',
+          );
+        }
+
+        if (mounted) {
+          setState(() {
+            _collectionRequests = scheduledCollections;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading scheduled collections for driver: $e');
+    }
   }
 
   /// Get collection request markers for the map
   List<Marker> _getCollectionRequestMarkers() {
-    if (!_showCollectionRequests) return [];
+    if (!_showCollectionRequests) {
+      print(
+        'MapScreen: _showCollectionRequests is false, returning empty markers',
+      );
+      return [];
+    }
 
-    return _collectionRequests
+    final currentUser = FirebaseAuthService.currentUser;
+    print('MapScreen: Getting collection request markers');
+    print(
+      'MapScreen: Current user: ${currentUser?.id}, role: ${currentUser?.role}',
+    );
+    print(
+      'MapScreen: Total collection requests: ${_collectionRequests.length}',
+    );
+
+    final filteredCollections = _collectionRequests.where((collection) {
+      // Filter collection requests based on user role
+      if (currentUser == null) {
+        print(
+          'MapScreen: No current user, skipping collection ${collection.id}',
+        );
+        return false;
+      }
+
+      // Admin: See all collection requests
+      if (currentUser.role == UserRole.administrator) {
+        print('MapScreen: Admin user, showing collection ${collection.id}');
+        return true;
+      }
+
+      // Barangay Official: See pending requests for approval
+      if (currentUser.role == UserRole.barangayOfficial) {
+        final shouldShow =
+            collection.status == CollectionStatus.pending ||
+            collection.status == CollectionStatus.approved ||
+            collection.status == CollectionStatus.rejected;
+        print(
+          'MapScreen: Barangay official, collection ${collection.id} status: ${collection.status}, shouldShow: $shouldShow',
+        );
+        return shouldShow;
+      }
+
+      // Driver: See scheduled and in-progress requests assigned to them
+      if (currentUser.role == UserRole.driver) {
+        final isAssigned = collection.assignedTo == currentUser.id;
+        final isCorrectStatus =
+            collection.status == CollectionStatus.scheduled ||
+            collection.status == CollectionStatus.inProgress;
+        final shouldShow = isCorrectStatus && isAssigned;
+        print(
+          'MapScreen: Driver, collection ${collection.id} status: ${collection.status}, assignedTo: ${collection.assignedTo}, currentUser: ${currentUser.id}, shouldShow: $shouldShow',
+        );
+        return shouldShow;
+      }
+
+      // Resident: See only their own requests
+      if (currentUser.role == UserRole.resident) {
+        final shouldShow = collection.userId == currentUser.id;
+        print(
+          'MapScreen: Resident, collection ${collection.id} userId: ${collection.userId}, currentUser: ${currentUser.id}, shouldShow: $shouldShow',
+        );
+        return shouldShow;
+      }
+
+      // Default: show no requests
+      print('MapScreen: Unknown role, skipping collection ${collection.id}');
+      return false;
+    }).toList();
+
+    print(
+      'MapScreen: Filtered collections count: ${filteredCollections.length}',
+    );
+
+    final markers = filteredCollections
         .map((collection) {
+          print('MapScreen: Creating marker for collection ${collection.id}');
           // Use actual coordinates from collection request if available
           LatLng coords;
           if (collection.latitude != null && collection.longitude != null) {
             coords = LatLng(collection.latitude!, collection.longitude!);
+            print(
+              'MapScreen: Using actual coordinates: ${collection.latitude}, ${collection.longitude}',
+            );
           } else {
             // Fallback to Valenzuela City coordinates if no specific location
             final barangayCoords = _barangayCoordinates['Valenzuela City'];
-            if (barangayCoords == null) return null;
+            if (barangayCoords == null) {
+              print(
+                'MapScreen: No coordinates available for collection ${collection.id}',
+              );
+              return null;
+            }
             coords = barangayCoords;
+            print(
+              'MapScreen: Using fallback coordinates: ${coords.latitude}, ${coords.longitude}',
+            );
           }
 
           final isSelected = _selectedCollectionRequest?.id == collection.id;
@@ -2380,174 +3175,14 @@ class _MapScreenState extends State<MapScreen>
         .where((marker) => marker != null)
         .cast<Marker>()
         .toList();
+
+    print('MapScreen: Final markers created: ${markers.length}');
+    return markers;
   }
 
   /// Get online user markers for the map
-  List<Marker> _getOnlineUserMarkers() {
-    if (!_showOnlineUsers || _onlineUsers.isEmpty) return [];
-
-    return _onlineUsers
-        .where((user) {
-          // Only show users with valid location data
-          final location = user['location'] as Map<String, dynamic>?;
-          return location != null &&
-              location['latitude'] != null &&
-              location['longitude'] != null;
-        })
-        .map((user) {
-          final location = user['location'] as Map<String, dynamic>;
-          final coords = LatLng(
-            location['latitude'] as double,
-            location['longitude'] as double,
-          );
-
-          return Marker(
-            point: coords,
-            width: 120,
-            height: 120,
-            child: GestureDetector(
-              onTap: () => _showUserInfoDialog(user),
-              child: _buildGlowingUserMarker(user),
-            ),
-          );
-        })
-        .toList();
-  }
 
   /// Build glowing user marker with animation and chat bubble name label
-  Widget _buildGlowingUserMarker(Map<String, dynamic> user) {
-    return TweenAnimationBuilder<double>(
-      duration: const Duration(seconds: 2),
-      tween: Tween(begin: 0.3, end: 1.0),
-      builder: (context, value, child) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Chat bubble name label
-            Container(
-              constraints: const BoxConstraints(maxWidth: 120),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  // Main bubble
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade300, width: 1),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      user['userName'] ?? 'Unknown',
-                      style: TextStyle(
-                        color: Colors.grey.shade800,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  // Chat bubble tail pointing down
-                  Positioned(
-                    bottom: -4,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border(
-                            left: BorderSide(
-                              color: Colors.grey.shade300,
-                              width: 1,
-                            ),
-                            right: BorderSide(
-                              color: Colors.grey.shade300,
-                              width: 1,
-                            ),
-                            bottom: BorderSide(
-                              color: Colors.grey.shade300,
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                        transform: Matrix4.rotationZ(0.785), // 45 degrees
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 6),
-            // Glowing marker
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  // Outer glow
-                  BoxShadow(
-                    color: _getUserRoleColor(
-                      user['userRole'],
-                    ).withOpacity(value * 0.6),
-                    blurRadius: 15 + (value * 10),
-                    spreadRadius: 2 + (value * 3),
-                  ),
-                  // Inner glow
-                  BoxShadow(
-                    color: _getUserRoleColor(
-                      user['userRole'],
-                    ).withOpacity(value * 0.8),
-                    blurRadius: 8 + (value * 5),
-                    spreadRadius: 1 + (value * 2),
-                  ),
-                  // White border shadow
-                  BoxShadow(
-                    color: Colors.white.withOpacity(0.9),
-                    blurRadius: 3,
-                    spreadRadius: 0,
-                  ),
-                ],
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _getUserRoleColor(user['userRole']),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 3),
-                ),
-                child: Icon(
-                  _getUserRoleIcon(user['userRole']),
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-      onEnd: () {
-        // Restart animation
-        if (mounted) {
-          setState(() {});
-        }
-      },
-    );
-  }
 
   /// Get color for waste type
   Color _getWasteTypeColor(String wasteType) {
@@ -2582,6 +3217,8 @@ class _MapScreenState extends State<MapScreen>
         return Colors.green;
       case CollectionStatus.cancelled:
         return Colors.red;
+      case CollectionStatus.rejected:
+        return Colors.red;
     }
   }
 
@@ -2603,235 +3240,6 @@ class _MapScreenState extends State<MapScreen>
     }
   }
 
-  void _showUserInfoDialog(Map<String, dynamic> user) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.white, Colors.grey.shade50],
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 15,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      _getUserRoleColor(user['userRole']),
-                      _getUserRoleColor(user['userRole']).withOpacity(0.8),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        _getUserRoleIcon(user['userRole']),
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user['userName'] ?? 'Unknown User',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              user['userRole'] ?? 'Unknown Role',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // Content
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _getUserRoleColor(user['userRole']).withOpacity(0.2),
-                    width: 1.5,
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    _buildCompactInfoRow(
-                      Icons.location_on,
-                      'Barangay',
-                      user['barangay'] ?? 'Unknown',
-                      Colors.blue,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildCompactInfoRow(
-                      Icons.access_time,
-                      'Last Seen',
-                      _formatTimeAgo(user['lastSeen']),
-                      Colors.green,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildCompactInfoRow(
-                      Icons.email,
-                      'Email',
-                      user['userEmail'] ?? 'Unknown',
-                      Colors.purple,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // Action Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'Close',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            _getUserRoleColor(user['userRole']),
-                            _getUserRoleColor(
-                              user['userRole'],
-                            ).withOpacity(0.8),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _getUserRoleColor(
-                              user['userRole'],
-                            ).withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _navigateToUserLocation(user);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.location_on,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                            SizedBox(width: 6),
-                            Text(
-                              'Navigate',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   /// Get distance text for collection request
   String _getCollectionDistanceText(WasteCollection collection) {
     if (_currentLocation == null ||
@@ -2841,8 +3249,10 @@ class _MapScreenState extends State<MapScreen>
     }
 
     final distance = _calculateDistance(
-      _currentLocation!,
-      LatLng(collection.latitude!, collection.longitude!),
+      _currentLocation!.latitude,
+      _currentLocation!.longitude,
+      collection.latitude!,
+      collection.longitude!,
     );
 
     if (distance < 1) {
@@ -2983,8 +3393,9 @@ class _MapScreenState extends State<MapScreen>
       _mapController?.dispose();
       _mapController = null;
       _collectionRequestsSubscription?.cancel();
-      _onlineUsersSubscription?.cancel(); // Cancel online users subscription
       _announcementSubscription?.cancel(); // Cancel announcement subscription
+      _driverLocationSubscription
+          ?.cancel(); // Cancel driver location subscription
       LocationTrackingService.stopLocationTracking();
 
       // Set user as offline when app closes
@@ -3551,6 +3962,8 @@ class _AllCollectionRequestsModalState
         return 'Completed';
       case CollectionStatus.cancelled:
         return 'Cancelled';
+      case CollectionStatus.rejected:
+        return 'Rejected';
     }
   }
 
@@ -3568,6 +3981,8 @@ class _AllCollectionRequestsModalState
         return Colors.green;
       case CollectionStatus.cancelled:
         return Colors.red;
+      case CollectionStatus.rejected:
+        return Colors.red;
     }
   }
 
@@ -3584,8 +3999,10 @@ class _AllCollectionRequestsModalState
     }
 
     final distance = _calculateDistance(
-      _currentLocation!,
-      LatLng(request.latitude!, request.longitude!),
+      _currentLocation!.latitude,
+      _currentLocation!.longitude,
+      request.latitude!,
+      request.longitude!,
     );
 
     if (distance < 1) {
@@ -3596,22 +4013,31 @@ class _AllCollectionRequestsModalState
   }
 
   /// Calculate distance between two points in kilometers
-  double _calculateDistance(LatLng point1, LatLng point2) {
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     const double earthRadius = 6371; // Earth's radius in kilometers
 
-    double lat1Rad = point1.latitude * (pi / 180);
-    double lat2Rad = point2.latitude * (pi / 180);
-    double deltaLatRad = (point2.latitude - point1.latitude) * (pi / 180);
-    double deltaLngRad = (point2.longitude - point1.longitude) * (pi / 180);
+    final double dLat = _degreesToRadians(lat2 - lat1);
+    final double dLon = _degreesToRadians(lon2 - lon1);
 
-    double a =
-        sin(deltaLatRad / 2) * sin(deltaLatRad / 2) +
-        cos(lat1Rad) *
-            cos(lat2Rad) *
-            sin(deltaLngRad / 2) *
-            sin(deltaLngRad / 2);
-    double c = 2 * asin(sqrt(a));
+    final double a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_degreesToRadians(lat1)) *
+            math.cos(_degreesToRadians(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
 
     return earthRadius * c;
+  }
+
+  /// Convert degrees to radians
+  double _degreesToRadians(double degrees) {
+    return degrees * (math.pi / 180);
   }
 }

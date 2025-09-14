@@ -3,6 +3,7 @@ import 'dart:async';
 import '../../utils/constants.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/firebase_collection_service.dart';
+import '../../services/route_optimization_service.dart';
 import '../../models/waste_collection.dart';
 import '../../widgets/announcement_card.dart';
 import '../map/map_screen.dart';
@@ -15,12 +16,12 @@ class DriverDashboardScreen extends StatefulWidget {
 }
 
 class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
-  List<WasteCollection> _approvedRequests = [];
+  List<WasteCollection> _scheduledCollections = [];
 
   @override
   void initState() {
     super.initState();
-    _loadApprovedRequests();
+    _loadScheduledCollections();
   }
 
   @override
@@ -28,20 +29,37 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
     super.dispose();
   }
 
-  Future<void> _loadApprovedRequests() async {
+  Future<void> _loadScheduledCollections() async {
     try {
-      final requests =
-          await FirebaseCollectionService.getApprovedCollectionRequests();
-      if (mounted) {
-        setState(() {
-          _approvedRequests = requests;
-        });
+      final currentUser = FirebaseAuthService.currentUser;
+      if (currentUser != null) {
+        final collections =
+            await RouteOptimizationService.getOptimizedRouteForUser(
+              userId: currentUser.id,
+              userRole: currentUser.role,
+            );
+
+        print(
+          'Driver dashboard: Loaded ${collections.length} scheduled collections',
+        );
+        for (var collection in collections) {
+          print(
+            'Scheduled collection: ${collection.id}, status: ${collection.status}, address: ${collection.address}',
+          );
+        }
+
+        if (mounted) {
+          setState(() {
+            _scheduledCollections = collections;
+          });
+        }
       }
     } catch (e) {
+      print('Error loading scheduled collections: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading approved requests: $e'),
+            content: Text('Error loading scheduled collections: $e'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -158,6 +176,14 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
                               ],
                             ),
                           ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.refresh,
+                              color: Colors.white,
+                            ),
+                            onPressed: _loadScheduledCollections,
+                            tooltip: 'Refresh Collections',
+                          ),
                         ],
                       ),
                       const SizedBox(height: AppSizes.paddingMedium),
@@ -210,8 +236,8 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
             child: LatestAnnouncementCard(),
           ),
 
-          // Approved Requests Overlay (if there are requests)
-          if (_approvedRequests.isNotEmpty)
+          // Scheduled Collections Overlay (if there are collections)
+          if (_scheduledCollections.isNotEmpty)
             Positioned(
               top: 200,
               left: AppSizes.paddingLarge,
@@ -234,14 +260,14 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Approved Requests',
+                      'Scheduled Collections',
                       style: AppTextStyles.heading3.copyWith(
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: AppSizes.paddingSmall),
-                    ..._approvedRequests
+                    ..._scheduledCollections
                         .take(2)
                         .map(
                           (request) => Container(
@@ -315,9 +341,9 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
                             ),
                           ),
                         ),
-                    if (_approvedRequests.length > 2)
+                    if (_scheduledCollections.length > 2)
                       Text(
-                        '+${_approvedRequests.length - 2} more requests',
+                        '+${_scheduledCollections.length - 2} more requests',
                         style: AppTextStyles.caption.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,

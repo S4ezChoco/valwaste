@@ -52,14 +52,63 @@ class _DriverRouteMapScreenState extends State<DriverRouteMapScreen> {
     }
   }
 
+  Future<void> _refreshRoute() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _loadOptimizedRoute();
+      _createRouteMarkers();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Route refreshed successfully'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error refreshing route: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error refreshing route: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _loadOptimizedRoute() async {
     try {
       final currentUser = FirebaseAuthService.currentUser;
       if (currentUser != null) {
+        print(
+          'Loading optimized route for user: ${currentUser.id}, role: ${currentUser.role}',
+        );
+
         final route = await RouteOptimizationService.getOptimizedRouteForUser(
           userId: currentUser.id,
           userRole: currentUser.role,
         );
+
+        print('Found ${route.length} scheduled collections for driver');
+        for (var collection in route) {
+          print(
+            'Collection: ${collection.id}, Status: ${collection.status}, AssignedTo: ${collection.assignedTo}, Address: ${collection.address}',
+          );
+        }
 
         final stats = await RouteOptimizationService.calculateRouteStatistics(
           route,
@@ -193,6 +242,7 @@ class _DriverRouteMapScreenState extends State<DriverRouteMapScreen> {
   }
 
   void _createRouteMarkers() {
+    print('Creating route markers for ${_optimizedRoute.length} collections');
     _routeMarkers.clear();
     _routePoints.clear();
 
@@ -225,7 +275,21 @@ class _DriverRouteMapScreenState extends State<DriverRouteMapScreen> {
     // Add route stop markers from optimized route
     for (int i = 0; i < _optimizedRoute.length; i++) {
       final collection = _optimizedRoute[i];
-      final coordinates = _getCoordinatesFromAddress(collection.address);
+
+      // Use actual coordinates from collection if available, otherwise geocode address
+      LatLng coordinates;
+      if (collection.latitude != null && collection.longitude != null) {
+        coordinates = LatLng(collection.latitude!, collection.longitude!);
+        print(
+          'Using actual coordinates for collection ${collection.id}: ${collection.latitude}, ${collection.longitude}',
+        );
+      } else {
+        coordinates = _getCoordinatesFromAddress(collection.address);
+        print(
+          'Geocoding address for collection ${collection.id}: ${collection.address}',
+        );
+      }
+
       _routePoints.add(coordinates);
 
       _routeMarkers.add(
@@ -263,6 +327,10 @@ class _DriverRouteMapScreenState extends State<DriverRouteMapScreen> {
         ),
       );
     }
+
+    print(
+      'Created ${_routeMarkers.length} markers and ${_routePoints.length} route points',
+    );
 
     if (mounted) {
       setState(() {});
@@ -333,7 +401,7 @@ class _DriverRouteMapScreenState extends State<DriverRouteMapScreen> {
     switch (status.toLowerCase()) {
       case 'completed':
         return Colors.green;
-      case 'in_progress':
+      case 'inProgress':
         return Colors.blue;
       case 'pending':
       default:
@@ -692,6 +760,11 @@ class _DriverRouteMapScreenState extends State<DriverRouteMapScreen> {
             icon: const Icon(Icons.route),
             onPressed: _showFullRoute,
             tooltip: 'Show Full Route',
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshRoute,
+            tooltip: 'Refresh Route',
           ),
         ],
       ),
@@ -2151,6 +2224,8 @@ class _CollectionRequestsModalState extends State<CollectionRequestsModal> {
         return 'Completed';
       case CollectionStatus.cancelled:
         return 'Cancelled';
+      case CollectionStatus.rejected:
+        return 'Rejected';
     }
   }
 
@@ -2168,6 +2243,8 @@ class _CollectionRequestsModalState extends State<CollectionRequestsModal> {
       case CollectionStatus.completed:
         return Colors.green;
       case CollectionStatus.cancelled:
+        return Colors.red;
+      case CollectionStatus.rejected:
         return Colors.red;
     }
   }

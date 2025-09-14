@@ -84,6 +84,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadDrivers();
     loadWasteCollectors();
     loadSchedules();
+    loadApprovedRequests();
     
     // Clean up old schedules (older than 7 days)
     cleanupOldSchedules();
@@ -475,6 +476,9 @@ function openCreateModal() {
     document.getElementById('create-schedule-modal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
     
+    // Load approved requests immediately when modal opens
+    loadApprovedRequests();
+    
     // Initialize map when modal opens
     setTimeout(() => {
         initLocationMap();
@@ -511,6 +515,12 @@ function resetForm() {
     document.getElementById('driver-selected-text').textContent = 'Select driver';
     document.getElementById('collectors-selected-text').textContent = 'Select waste collectors';
     document.getElementById('selected-driver').value = '';
+    
+    // Reset approved request selection
+    const approvedRequestSelect = document.getElementById('approved-request-select');
+    if (approvedRequestSelect) {
+        approvedRequestSelect.selectedIndex = 0;
+    }
     
     // Clear street markers
     if (window.streetMarkers) {
@@ -1317,8 +1327,55 @@ function handleCreateSchedule(event) {
     
     // Save to Firestore
     db.collection('truck_schedule').add(schedule)
-        .then((docRef) => {
+        .then(async (docRef) => {
             console.log('Schedule created with ID:', docRef.id);
+            
+            // If an approved request is selected, update its status to scheduled
+            const approvedRequestSelect = document.getElementById('approved-request-select');
+            if (approvedRequestSelect && approvedRequestSelect.value) {
+                try {
+                    await db.collection('collections').doc(approvedRequestSelect.value).update({
+                        status: 'scheduled',
+                        scheduled_date: date,
+                        scheduled_at: new Date().toISOString(),
+                        scheduled_by: 'admin',
+                        assigned_to: selectedDriverId,
+                        assigned_role: 'driver',
+                        assigned_at: new Date().toISOString(),
+                        truck_id: truck,
+                        start_time: startTime,
+                        end_time: endTime
+                    });
+                    
+                    console.log('Collection status updated to scheduled');
+                    
+                    // Send notification to the driver
+                    try {
+                        await db.collection('notifications').add({
+                            user_id: selectedDriverId,
+                            title: 'New Collection Assignment',
+                            message: `You have been assigned a new collection for ${date} from ${startTime} to ${endTime}`,
+                            type: 'collection_assigned',
+                            data: {
+                                collection_id: approvedRequestSelect.value,
+                                scheduled_date: date,
+                                truck_id: truck,
+                                start_time: startTime,
+                                end_time: endTime
+                            },
+                            created_at: new Date().toISOString(),
+                            read: false
+                        });
+                        console.log('Notification sent to driver');
+                    } catch (notificationError) {
+                        console.log('Could not send notification to driver:', notificationError);
+                    }
+                    
+                } catch (updateError) {
+                    console.error('Error updating collection status:', updateError);
+                }
+            }
+            
             showSuccess('Schedule created successfully!');
             closeCreateModal();
             resetForm();
@@ -1375,6 +1432,9 @@ function openCreateModal() {
     // Show all streets immediately
     displayStreetsChecklist(getStreetsArray());
     
+    // Load approved requests immediately when modal opens
+    loadApprovedRequests();
+    
     // Initialize map after modal animation completes
     setTimeout(() => {
         // Ensure map container is visible
@@ -1384,8 +1444,13 @@ function openCreateModal() {
             mapContainer.style.visibility = 'visible';
         }
         
-        // Initialize map
-        initLocationMap();
+        // Initialize map if not already done
+        if (!scheduleMap) {
+            console.log('Initializing map for modal...');
+            initLocationMap();
+        } else {
+            console.log('Map already initialized');
+        }
         
         // Force resize after a small delay
         setTimeout(() => {
@@ -1617,3 +1682,677 @@ document.addEventListener('keydown', function(event) {
         }
     }
 });
+
+// ===== APPROVED REQUESTS FUNCTIONS =====
+
+// Load approved collection requests
+async function loadApprovedRequests() {
+    try {
+        console.log('Loading approved collection requests...');
+        
+        // Get approved requests from Firebase
+        const approvedRequestsSnapshot = await db.collection('collections')
+            .where('status', '==', 'approved')
+            .orderBy('approved_at', 'desc')
+            .get();
+        
+        const approvedRequests = [];
+        approvedRequestsSnapshot.forEach(doc => {
+            approvedRequests.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        console.log('Found approved requests:', approvedRequests.length);
+        
+        // Display in modal
+        displayApprovedRequests(approvedRequests);
+        
+        // Show modal
+        document.getElementById('approved-requests-modal').style.display = 'flex';
+        
+    } catch (error) {
+        console.error('Error loading approved requests:', error);
+        showError('Error loading approved requests: ' + error.message);
+    }
+}
+
+// Display approved requests in the modal
+function displayApprovedRequests(requests) {
+    const container = document.getElementById('approved-requests-list');
+    
+    if (requests.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 16px; opacity: 0.5;">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14,2 14,8 20,8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+                <div style="font-weight: 500; margin-bottom: 4px;">No Approved Requests</div>
+                <div style="font-size: 14px;">All approved requests have been scheduled</div>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    requests.forEach(request => {
+        const wasteTypeText = getWasteTypeText(request.waste_type);
+        const approvedDate = request.approved_at ? new Date(request.approved_at).toLocaleString() : 'Unknown';
+        const scheduledDate = request.scheduled_date ? new Date(request.scheduled_date).toLocaleDateString() : 'Not scheduled';
+        
+        html += `
+            <div class="approved-request-item" style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px; background: #fafafa;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <span style="background: #10b981; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">
+                                APPROVED
+                            </span>
+                            <span style="font-weight: 600; color: #374151;">${wasteTypeText}</span>
+                        </div>
+                        
+                        <div style="margin-bottom: 8px;">
+                            <div style="font-weight: 500; color: #374151; margin-bottom: 4px;">
+                                ${request.quantity} ${request.unit} - ${request.description || 'No description'}
+                            </div>
+                            <div style="font-size: 14px; color: #6b7280; margin-bottom: 4px;">
+                                📍 ${request.address}
+                            </div>
+                            <div style="font-size: 12px; color: #6b7280;">
+                                Approved: ${approvedDate} | Scheduled: ${scheduledDate}
+                            </div>
+                            ${request.latitude && request.longitude ? `
+                                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+                                    📍 Lat: ${parseFloat(request.latitude).toFixed(6)}, Lng: ${parseFloat(request.longitude).toFixed(6)}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                        <button onclick="scheduleApprovedRequest('${request.id}')"
+                            style="padding: 6px 12px; border: 1px solid #3b82f6; border-radius: 6px; background: white; cursor: pointer; font-size: 12px; color: #3b82f6; transition: all 0.2s;"
+                            onmouseover="this.style.background='#eff6ff'"
+                            onmouseout="this.style.background='white'">
+                            📅 Schedule
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// Schedule an approved request
+function scheduleApprovedRequest(requestId) {
+    // Close the approved requests modal
+    closeApprovedRequestsModal();
+    
+    // Open the create schedule modal with pre-filled data
+    setTimeout(() => {
+        openCreateModal();
+        
+        // Pre-fill the form with approved request data
+        prefillScheduleForm(requestId);
+    }, 300);
+}
+
+// Pre-fill the schedule form with approved request data
+async function prefillScheduleForm(requestId) {
+    try {
+        const requestDoc = await db.collection('collections').doc(requestId).get();
+        const requestData = requestDoc.data();
+        
+        if (requestData) {
+            // Set the location from the approved request
+            if (requestData.latitude && requestData.longitude) {
+                selectedLocation = {
+                    lat: parseFloat(requestData.latitude),
+                    lng: parseFloat(requestData.longitude)
+                };
+                
+                // Update coordinates display
+                updateCoordinatesDisplay();
+                
+                // Center map on the location
+                if (scheduleMap) {
+                    scheduleMap.setCenter([selectedLocation.lng, selectedLocation.lat]);
+                    scheduleMap.setZoom(16);
+                }
+            }
+            
+            // Store the request ID for later use
+            window.currentApprovedRequestId = requestId;
+            
+            // Show a message that form is pre-filled
+            showSuccess('Form pre-filled with approved request data. Please select truck, driver, and schedule time.');
+        }
+    } catch (error) {
+        console.error('Error pre-filling form:', error);
+        showError('Error loading request data');
+    }
+}
+
+// Close approved requests modal
+function closeApprovedRequestsModal() {
+    document.getElementById('approved-requests-modal').style.display = 'none';
+}
+
+// Helper function to get waste type text
+function getWasteTypeText(wasteType) {
+    const wasteTypes = {
+        'general': 'General Waste',
+        'recyclable': 'Recyclable',
+        'organic': 'Organic',
+        'hazardous': 'Hazardous',
+        'electronic': 'Electronic'
+    };
+    return wasteTypes[wasteType] || wasteType;
+}
+
+// Update the handleCreateSchedule function to handle approved requests
+function handleCreateScheduleWithApprovedRequest(event) {
+    event.preventDefault();
+    
+    // Get form values
+    const truck = document.getElementById('truck-select').value;
+    const date = document.getElementById('schedule-date').value;
+    const startTime = document.getElementById('start-time').value;
+    const endTime = document.getElementById('end-time').value;
+    
+    // Validate required fields
+    if (!selectedDriverId) {
+        showError('Please select a driver.');
+        return;
+    }
+    
+    if (selectedCollectors.length !== 3) {
+        showError('Please select exactly 3 waste collectors.');
+        return;
+    }
+    
+    if (!selectedLocation) {
+        showError('Please select a location on the map.');
+        return;
+    }
+    
+    // Validate time
+    if (endTime <= startTime) {
+        showError('End time must be later than start time.');
+        return;
+    }
+    
+    // Create schedule object
+    const schedule = {
+        truck,
+        date,
+        startTime,
+        endTime,
+        driverId: selectedDriverId,
+        driver: document.getElementById('driver-selected-text').textContent,
+        collectors: selectedCollectors,
+        location: selectedLocation,
+        streets: ['Approved Request Location'], // Default street
+        status: 'scheduled',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    // If this is from an approved request, include the request ID
+    if (window.currentApprovedRequestId) {
+        schedule.approvedRequestId = window.currentApprovedRequestId;
+    }
+    
+    // Save to Firestore
+    db.collection('truck_schedule').add(schedule)
+        .then(async (docRef) => {
+            console.log('Schedule created with ID:', docRef.id);
+            
+            // If this is from an approved request, update the collection status
+            if (window.currentApprovedRequestId) {
+                try {
+                    await db.collection('collections').doc(window.currentApprovedRequestId).update({
+                        status: 'scheduled',
+                        scheduled_by: 'Administrator', // You might want to get actual admin name
+                        scheduled_at: firebase.firestore.FieldValue.serverTimestamp(),
+                        schedule_id: docRef.id
+                    });
+                    
+                    console.log('Updated collection status to scheduled');
+                } catch (error) {
+                    console.error('Error updating collection status:', error);
+                }
+                
+                // Clear the approved request ID
+                window.currentApprovedRequestId = null;
+            }
+            
+            showSuccess('Schedule created successfully!');
+            closeCreateModal();
+            loadSchedules();
+        })
+        .catch((error) => {
+            console.error('Error creating schedule:', error);
+            showError('Error creating schedule: ' + error.message);
+        });
+}
+
+// Close approved requests modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('approved-requests-modal');
+    if (event.target === modal) {
+        closeApprovedRequestsModal();
+    }
+});
+
+// Load approved collection requests for dropdown
+async function loadApprovedRequests() {
+    try {
+        console.log('Loading approved collection requests...');
+        
+        const approvedRequestSelect = document.getElementById('approved-request-select');
+        if (!approvedRequestSelect) return;
+        
+        // Show loading state
+        approvedRequestSelect.innerHTML = '<option value="" disabled selected>Loading approved requests...</option>';
+        
+        const snapshot = await db.collection('collections')
+            .where('status', '==', 'approved')
+            .get();
+        
+        console.log(`Found ${snapshot.size} approved collection requests`);
+        
+        // Clear existing options except the first one
+        approvedRequestSelect.innerHTML = '<option value="" disabled selected>Select approved collection request</option>';
+        
+        if (snapshot.empty) {
+            approvedRequestSelect.innerHTML = '<option value="" disabled selected>No approved requests found</option>';
+            console.log('No approved requests found');
+            return;
+        }
+        
+        for (const doc of snapshot.docs) {
+            const collectionData = doc.data();
+            
+            // Get user information
+            let userName = 'Unknown User';
+            try {
+                const userDoc = await db.collection('users').doc(collectionData.user_id).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    userName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.email || 'Unknown User';
+                }
+            } catch (userError) {
+                console.log('Could not fetch user data:', userError);
+            }
+            
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = `${userName} - ${collectionData.waste_type || 'General'} (${collectionData.quantity || 0} ${collectionData.unit || 'kg'}) - ${collectionData.address || 'No address'}`;
+            option.dataset.collectionData = JSON.stringify(collectionData);
+            approvedRequestSelect.appendChild(option);
+        }
+        
+        console.log('Approved requests loaded successfully');
+        
+    } catch (error) {
+        console.error('Error loading approved requests:', error);
+        const approvedRequestSelect = document.getElementById('approved-request-select');
+        if (approvedRequestSelect) {
+            approvedRequestSelect.innerHTML = '<option value="" disabled selected>Error loading requests</option>';
+        }
+        showError('Failed to load approved requests: ' + error.message);
+    }
+}
+
+// Load approved request details and auto-fill form
+async function loadApprovedRequestDetails() {
+    try {
+        const approvedRequestSelect = document.getElementById('approved-request-select');
+        const selectedOption = approvedRequestSelect.options[approvedRequestSelect.selectedIndex];
+        
+        if (!selectedOption || !selectedOption.value) {
+            return;
+        }
+        
+        const collectionData = JSON.parse(selectedOption.dataset.collectionData);
+        console.log('Loading details for collection:', collectionData);
+        
+        // Auto-fill location information
+        if (collectionData.latitude && collectionData.longitude) {
+            selectedLocation = {
+                lat: collectionData.latitude,
+                lng: collectionData.longitude,
+                address: collectionData.address || 'Selected location'
+            };
+            
+            // Update coordinates display immediately (doesn't depend on map)
+            const coordinatesDisplay = document.getElementById('coordinates-display');
+            if (coordinatesDisplay) {
+                coordinatesDisplay.innerHTML = `
+                    <strong>Selected Location:</strong><br>
+                    ${collectionData.address || 'Selected location'}<br>
+                    <small>Coordinates: ${collectionData.latitude}, ${collectionData.longitude}</small>
+                `;
+            }
+            
+            // Wait for map to be fully loaded before adding marker
+            const addMarkerToMap = () => {
+                if (scheduleMap && scheduleMap.isStyleLoaded && scheduleMap.isStyleLoaded()) {
+                    // Clear existing markers
+                    if (scheduleMap.getSource('resident-location')) {
+                        scheduleMap.removeSource('resident-location');
+                    }
+                    if (scheduleMap.getLayer('resident-location-marker')) {
+                        scheduleMap.removeLayer('resident-location-marker');
+                    }
+                    
+                    // Add new marker for resident location using MapLibre GL
+                    scheduleMap.addSource('resident-location', {
+                        type: 'geojson',
+                        data: {
+                            type: 'Feature',
+                            geometry: {
+                                type: 'Point',
+                                coordinates: [collectionData.longitude, collectionData.latitude]
+                            },
+                            properties: {
+                                title: 'Resident Location',
+                                address: collectionData.address || 'Selected location',
+                                coordinates: `${collectionData.latitude}, ${collectionData.longitude}`
+                            }
+                        }
+                    });
+                    
+                    // Add marker layer
+                    scheduleMap.addLayer({
+                        id: 'resident-location-marker',
+                        type: 'circle',
+                        source: 'resident-location',
+                        paint: {
+                            'circle-radius': 12,
+                            'circle-color': '#0ea5e9',
+                            'circle-stroke-width': 3,
+                            'circle-stroke-color': '#ffffff',
+                            'circle-opacity': 0.8
+                        }
+                    });
+                    
+                    // Add popup on click
+                    scheduleMap.on('click', 'resident-location-marker', function(e) {
+                        const coordinates = e.features[0].geometry.coordinates.slice();
+                        const properties = e.features[0].properties;
+                        
+                        new maplibregl.Popup()
+                            .setLngLat(coordinates)
+                            .setHTML(`
+                                <div style="padding: 8px;">
+                                    <b>${properties.title}</b><br>
+                                    ${properties.address}<br>
+                                    <small>Coordinates: ${properties.coordinates}</small>
+                                </div>
+                            `)
+                            .addTo(scheduleMap);
+                    });
+                    
+                    // Change cursor on hover
+                    scheduleMap.on('mouseenter', 'resident-location-marker', function() {
+                        scheduleMap.getCanvas().style.cursor = 'pointer';
+                    });
+                    
+                    scheduleMap.on('mouseleave', 'resident-location-marker', function() {
+                        scheduleMap.getCanvas().style.cursor = '';
+                    });
+                    
+                    // Center map on the location
+                    scheduleMap.flyTo({
+                        center: [collectionData.longitude, collectionData.latitude],
+                        zoom: 15
+                    });
+                    
+                    // Update coordinates display
+                    updateCoordinatesDisplay();
+                    
+                    console.log('Added resident location marker to map (MapLibre GL)');
+                } else {
+                    console.log('Map not ready, retrying in 500ms...');
+                    setTimeout(addMarkerToMap, 500);
+                }
+            };
+            
+            // Try to add marker immediately, or wait for map to be ready
+            if (scheduleMap && typeof scheduleMap.addSource === 'function') {
+                addMarkerToMap();
+            } else {
+                console.log('Map not initialized, waiting for map to be ready...');
+                // Wait for map to be initialized
+                const waitForMap = () => {
+                    if (scheduleMap && typeof scheduleMap.addSource === 'function') {
+                        addMarkerToMap();
+                    } else {
+                        setTimeout(waitForMap, 500);
+                    }
+                };
+                waitForMap();
+            }
+            
+            // Auto-check the corresponding street in the checklist
+            autoCheckStreetFromCoordinates(collectionData.latitude, collectionData.longitude, collectionData.address);
+        } else {
+            // If no coordinates, still show the address
+            const coordinatesDisplay = document.getElementById('coordinates-display');
+            if (coordinatesDisplay) {
+                coordinatesDisplay.innerHTML = `
+                    <strong>Selected Location:</strong><br>
+                    ${collectionData.address || 'No address provided'}
+                `;
+            }
+        }
+        
+        // Auto-fill waste type information (you can add this to a display area if needed)
+        console.log('Auto-filled location:', selectedLocation);
+        console.log('Collection details:', {
+            wasteType: collectionData.waste_type,
+            quantity: collectionData.quantity,
+            unit: collectionData.unit,
+            address: collectionData.address,
+            coordinates: `${collectionData.latitude}, ${collectionData.longitude}`
+        });
+        
+        // Show success message
+        showSuccess('Collection details loaded successfully! Location and coordinates have been set.');
+        
+    } catch (error) {
+        console.error('Error loading approved request details:', error);
+        showError('Failed to load collection details: ' + error.message);
+    }
+}
+
+// Auto-check street from coordinates
+function autoCheckStreetFromCoordinates(lat, lng, address) {
+    try {
+        console.log('Auto-checking street for coordinates:', lat, lng, address);
+        
+        // First, add or update the "Resident Location" option
+        addResidentLocationOption(lat, lng, address);
+        
+        // Get all street checkboxes
+        const streetCheckboxes = document.querySelectorAll('input[name="selected-streets"]');
+        
+        // Try to find matching street based on address or coordinates
+        for (const checkbox of streetCheckboxes) {
+            const streetName = checkbox.value;
+            const streetData = checkbox.dataset.streetData;
+            
+            if (streetData) {
+                try {
+                    const street = JSON.parse(streetData);
+                    
+                    // Check if coordinates are close to this street
+                    if (street.lat && street.lng) {
+                        const distance = calculateDistance(lat, lng, street.lat, street.lng);
+                        
+                        // If within 100 meters, auto-check this street
+                        if (distance < 0.1) {
+                            checkbox.checked = true;
+                            console.log('Auto-checked street:', streetName, 'Distance:', distance);
+                            
+                            // Trigger the change event to update the map
+                            checkbox.dispatchEvent(new Event('change'));
+                            break;
+                        }
+                    }
+                    
+                    // Also check if address contains street name
+                    if (address && address.toLowerCase().includes(streetName.toLowerCase())) {
+                        checkbox.checked = true;
+                        console.log('Auto-checked street by address match:', streetName);
+                        
+                        // Trigger the change event to update the map
+                        checkbox.dispatchEvent(new Event('change'));
+                        break;
+                    }
+                } catch (parseError) {
+                    console.log('Error parsing street data:', parseError);
+                }
+            }
+        }
+        
+        // Auto-check the "Resident Location" option
+        const residentLocationCheckbox = document.querySelector('input[name="selected-streets"][value="Resident Location"]');
+        if (residentLocationCheckbox) {
+            residentLocationCheckbox.checked = true;
+            console.log('Auto-checked Resident Location');
+            
+            // Set selectedLocation for validation
+            selectedLocation = {
+                lat: lat,
+                lng: lng,
+                address: address || 'Selected location'
+            };
+            console.log('Set selectedLocation for validation:', selectedLocation);
+            
+            // Trigger the change event to update the map
+            residentLocationCheckbox.dispatchEvent(new Event('change'));
+            
+            // Also add pin to map using the same logic as the MapLibre GL marker
+            setTimeout(() => {
+                const streetData = JSON.parse(residentLocationCheckbox.dataset.streetData);
+                if (streetData && streetData.lat && streetData.lng && scheduleMap && scheduleMap.isStyleLoaded && scheduleMap.isStyleLoaded()) {
+                    // Add street marker to map (same as resident location marker)
+                    if (scheduleMap.getSource('street-location')) {
+                        scheduleMap.removeSource('street-location');
+                    }
+                    if (scheduleMap.getLayer('street-location-marker')) {
+                        scheduleMap.removeLayer('street-location-marker');
+                    }
+                    
+                    scheduleMap.addSource('street-location', {
+                        type: 'geojson',
+                        data: {
+                            type: 'Feature',
+                            geometry: {
+                                type: 'Point',
+                                coordinates: [streetData.lng, streetData.lat]
+                            },
+                            properties: {
+                                title: 'Resident Location',
+                                address: streetData.address || 'Selected location'
+                            }
+                        }
+                    });
+                    
+                    scheduleMap.addLayer({
+                        id: 'street-location-marker',
+                        type: 'circle',
+                        source: 'street-location',
+                        paint: {
+                            'circle-radius': 12,
+                            'circle-color': '#0ea5e9',
+                            'circle-stroke-width': 3,
+                            'circle-stroke-color': '#ffffff',
+                            'circle-opacity': 0.8
+                        }
+                    });
+                    
+                    console.log('Added resident location pin to map via street selection');
+                }
+            }, 100);
+        }
+        
+    } catch (error) {
+        console.error('Error auto-checking street:', error);
+    }
+}
+
+// Add or update the "Resident Location" option in the checklist
+function addResidentLocationOption(lat, lng, address) {
+    try {
+        const streetsChecklist = document.getElementById('streets-checklist');
+        if (!streetsChecklist) return;
+        
+        // Check if "Resident Location" already exists
+        let residentLocationItem = document.querySelector('.street-item[data-street="Resident Location"]');
+        
+        if (!residentLocationItem) {
+            // Create new resident location item
+            residentLocationItem = document.createElement('div');
+            residentLocationItem.className = 'street-item';
+            residentLocationItem.setAttribute('data-street', 'Resident Location');
+            
+            residentLocationItem.innerHTML = `
+                <label class="street-checkbox">
+                    <input type="checkbox" name="selected-streets" value="Resident Location" 
+                           data-street-data='{"lat": ${lat}, "lng": ${lng}, "name": "Resident Location", "address": "${address || 'Selected location'}"}'>
+                    <span class="checkmark"></span>
+                    <span class="street-name">Resident Location</span>
+                    <span class="street-address">${address || 'Selected location'}</span>
+                </label>
+            `;
+            
+            // Add it at the top of the checklist
+            streetsChecklist.insertBefore(residentLocationItem, streetsChecklist.firstChild);
+            
+            console.log('Added Resident Location to checklist');
+        } else {
+            // Update existing resident location with new coordinates
+            const checkbox = residentLocationItem.querySelector('input[name="selected-streets"]');
+            const addressSpan = residentLocationItem.querySelector('.street-address');
+            
+            if (checkbox) {
+                checkbox.dataset.streetData = JSON.stringify({
+                    lat: lat,
+                    lng: lng,
+                    name: "Resident Location",
+                    address: address || 'Selected location'
+                });
+            }
+            
+            if (addressSpan) {
+                addressSpan.textContent = address || 'Selected location';
+            }
+            
+            console.log('Updated Resident Location in checklist');
+        }
+        
+    } catch (error) {
+        console.error('Error adding resident location option:', error);
+    }
+}
+
+// Calculate distance between two coordinates (in kilometers)
+function calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371; // Radius of the Earth in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}

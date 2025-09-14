@@ -441,6 +441,8 @@ class DriverCollectionService {
         return 'Completed';
       case CollectionStatus.cancelled:
         return 'Cancelled';
+      case CollectionStatus.rejected:
+        return 'Rejected';
     }
   }
 }

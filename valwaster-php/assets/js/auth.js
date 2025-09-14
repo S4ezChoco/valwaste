@@ -20,6 +20,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// Export db for use in other modules
+export { db };
+
 // Global authentication state
 let currentUser = null;
 

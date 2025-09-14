@@ -1569,6 +1569,23 @@ html, body {
   background: #dcfce7;
 }
 
+.btn-info {
+  background: #eff6ff;
+  color: #1e40af;
+  border-color: #bfdbfe;
+}
+
+.btn-info:hover {
+  background: #dbeafe;
+}
+
+.btn-info:disabled {
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: #d1d5db;
+  cursor: not-allowed;
+}
+
 .btn-unresolve {
   background: #fff7ed;
   color: #ea580c;
@@ -1772,6 +1789,21 @@ html, body {
 
 .btn-resolve:hover {
   background: #a7f3d0;
+}
+
+.btn-info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.btn-info:hover {
+  background: #bfdbfe;
+}
+
+.btn-info:disabled {
+  background: #f3f4f6;
+  color: #6b7280;
+  cursor: not-allowed;
 }
 
 /* Responsive styles for report management */
@@ -2671,5 +2703,72 @@ html, body {
   .sched-modal-card {
     max-height: 94vh;
   }
+}
+
+/* Collection Approval Report Styles */
+.collection-approval-badge {
+    background: linear-gradient(135deg, #04A90C, #3AC84D);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.collection-details-section {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+}
+
+.collection-details-section .detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.collection-details-section .detail-item:last-child {
+    border-bottom: none;
+}
+
+.collection-details-section .detail-key {
+    font-weight: 600;
+    color: #495057;
+}
+
+.collection-details-section .detail-value {
+    color: #212529;
+    font-weight: 500;
+}
+
+/* Schedule Collection Button */
+.btn-schedule {
+    background: linear-gradient(135deg, #04A90C, #3AC84D);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-schedule:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(4, 169, 12, 0.3);
+}
+
+/* Loading indicator */
+.loading td {
+    text-align: center;
+    color: #6b7280;
+    font-style: italic;
+    padding: 20px;
 }
 

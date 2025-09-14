@@ -107,15 +107,17 @@ class AdvancedSchedulingService {
     required double quantity,
     required String unit,
     required String description,
-    required DateTime preferredDate,
-    required String preferredTimeSlot,
     required String address,
     required String barangay,
     double? latitude,
     double? longitude,
     String? notes,
     bool isUrgent = false,
+    DateTime? preferredDate,
+    String? preferredTimeSlot,
     List<String>? alternativeDates,
+    String? priority,
+    String? category,
   }) async {
     try {
       if (FirebaseAuthService.currentUser == null) {
@@ -125,53 +127,57 @@ class AdvancedSchedulingService {
         };
       }
 
-      // Check if preferred time slot is available
-      final availableSlots = await getAvailableTimeSlots(
-        date: preferredDate,
-        wasteType: wasteType,
-        barangay: barangay,
-      );
+      // Set default values if not provided
+      DateTime scheduledDate =
+          preferredDate ?? DateTime.now().add(const Duration(days: 1));
+      String scheduledTimeSlot = preferredTimeSlot ?? '08:00-10:00';
 
-      DateTime scheduledDate = preferredDate;
-      String scheduledTimeSlot = preferredTimeSlot;
+      // Check if preferred time slot is available (only if both date and time are provided)
+      if (preferredDate != null && preferredTimeSlot != null) {
+        final availableSlots = await getAvailableTimeSlots(
+          date: preferredDate,
+          wasteType: wasteType,
+          barangay: barangay,
+        );
 
-      if (!availableSlots.contains(preferredTimeSlot)) {
-        // Try alternative dates
-        if (alternativeDates != null && alternativeDates.isNotEmpty) {
-          for (final altDateStr in alternativeDates) {
-            final altDate = DateTime.parse(altDateStr);
-            final altSlots = await getAvailableTimeSlots(
-              date: altDate,
-              wasteType: wasteType,
-              barangay: barangay,
-            );
-
-            if (altSlots.isNotEmpty) {
-              scheduledDate = altDate;
-              scheduledTimeSlot = altSlots.first;
-              break;
-            }
-          }
-        } else {
-          // Use first available slot on preferred date
-          if (availableSlots.isNotEmpty) {
-            scheduledTimeSlot = availableSlots.first;
-          } else {
-            // Find next available date
-            DateTime nextDate = preferredDate.add(const Duration(days: 1));
-            for (int i = 0; i < 7; i++) {
-              final slots = await getAvailableTimeSlots(
-                date: nextDate,
+        if (!availableSlots.contains(preferredTimeSlot)) {
+          // Try alternative dates
+          if (alternativeDates != null && alternativeDates.isNotEmpty) {
+            for (final altDateStr in alternativeDates) {
+              final altDate = DateTime.parse(altDateStr);
+              final altSlots = await getAvailableTimeSlots(
+                date: altDate,
                 wasteType: wasteType,
                 barangay: barangay,
               );
 
-              if (slots.isNotEmpty) {
-                scheduledDate = nextDate;
-                scheduledTimeSlot = slots.first;
+              if (altSlots.isNotEmpty) {
+                scheduledDate = altDate;
+                scheduledTimeSlot = altSlots.first;
                 break;
               }
-              nextDate = nextDate.add(const Duration(days: 1));
+            }
+          } else {
+            // Use first available slot on preferred date
+            if (availableSlots.isNotEmpty) {
+              scheduledTimeSlot = availableSlots.first;
+            } else {
+              // Find next available date
+              DateTime nextDate = preferredDate.add(const Duration(days: 1));
+              for (int i = 0; i < 7; i++) {
+                final slots = await getAvailableTimeSlots(
+                  date: nextDate,
+                  wasteType: wasteType,
+                  barangay: barangay,
+                );
+
+                if (slots.isNotEmpty) {
+                  scheduledDate = nextDate;
+                  scheduledTimeSlot = slots.first;
+                  break;
+                }
+                nextDate = nextDate.add(const Duration(days: 1));
+              }
             }
           }
         }
@@ -187,14 +193,35 @@ class AdvancedSchedulingService {
         0,
       );
 
-      // Calculate priority based on waste type and urgency
+      // Use user-selected priority or calculate based on waste type and urgency
       final wasteTypeString = wasteType.toString().split('.').last;
       final basePriority = _wasteTypePriority[wasteTypeString] ?? 5;
-      final finalPriority = isUrgent ? basePriority - 1 : basePriority;
+      final calculatedPriority = isUrgent ? basePriority - 1 : basePriority;
+
+      // Convert priority string to number if provided
+      int finalPriority = calculatedPriority;
+      if (priority != null) {
+        switch (priority.toLowerCase()) {
+          case 'high':
+            finalPriority = 1;
+            break;
+          case 'medium':
+            finalPriority = 3;
+            break;
+          case 'low':
+            finalPriority = 5;
+            break;
+        }
+      }
+
+      final currentUserId = FirebaseAuthService.currentUser!.id;
+      print('💾 Creating collection for user: $currentUserId');
+      print('💾 User ID type: ${currentUserId.runtimeType}');
+      print('💾 User ID length: ${currentUserId.length}');
 
       final collection = WasteCollection(
         id: 'collection_${DateTime.now().millisecondsSinceEpoch}',
-        userId: FirebaseAuthService.currentUser!.id,
+        userId: currentUserId,
         wasteType: wasteType,
         quantity: quantity,
         unit: unit,
@@ -213,13 +240,19 @@ class AdvancedSchedulingService {
       collectionData['barangay'] = barangay;
       collectionData['time_slot'] = scheduledTimeSlot;
       collectionData['priority'] = finalPriority;
+      collectionData['priority_text'] = priority ?? 'Medium';
+      collectionData['category'] = category ?? 'Collection Request';
       collectionData['is_urgent'] = isUrgent;
       collectionData['alternative_dates'] = alternativeDates ?? [];
+
+      print('💾 Saving collection data: $collectionData');
 
       await _firestore
           .collection('collections')
           .doc(collection.id)
           .set(collectionData);
+
+      print('✅ Collection saved successfully with ID: ${collection.id}');
 
       // Create notification for the user
       await _createNotification(
