@@ -378,10 +378,14 @@ function generateCalendar() {
         addBtn.type = 'button';
         addBtn.textContent = '+';
         addBtn.setAttribute('aria-label', 'Create schedule for this day');
-        addBtn.onclick = function() {
+        addBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Plus button clicked for day:', day);
             const date = new Date(currentYear, currentMonth, day);
+            console.log('Created date object:', date);
             openCreateModalForDate(date);
-        };
+        });
         cell.appendChild(addBtn);
         
         calendarGrid.appendChild(cell);
@@ -486,9 +490,25 @@ function openCreateModal() {
 }
 
 function openCreateModalForDate(date) {
+    console.log('=== openCreateModalForDate called ===');
+    console.log('Opening modal for date:', date);
     selectedDate = date;
-    document.getElementById('schedule-date').value = formatDateForInput(date);
+    const formattedDate = formatDateForInput(date);
+    console.log('Formatted date:', formattedDate);
+    
+    // Open modal first
     openCreateModal();
+    
+    // Then set the date after a small delay to ensure modal is loaded
+    setTimeout(() => {
+        const dateInput = document.getElementById('schedule-date');
+        if (dateInput) {
+            dateInput.value = formattedDate;
+            console.log('Date input set to:', dateInput.value);
+        } else {
+            console.error('Date input element not found');
+        }
+    }, 100);
 }
 
 function closeCreateModal() {
@@ -497,9 +517,15 @@ function closeCreateModal() {
     
     // Reset form
     document.getElementById('createScheduleForm').reset();
-    document.getElementById('schedule-date').value = formatDateForInput(new Date());
+    // Only reset to today's date if no specific date was selected
+    if (!selectedDate) {
+        document.getElementById('schedule-date').value = formatDateForInput(new Date());
+    }
     resetForm();
     closeAllDropdowns();
+    
+    // Clear selected date
+    selectedDate = null;
 }
 
 // Reset form and filters

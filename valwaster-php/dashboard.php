@@ -1590,11 +1590,207 @@
             );
         }
 
+        // Load recent reports function
+        async function loadRecentReports() {
+            console.log('Loading recent reports from Firebase...');
+            const recentReportsList = document.getElementById('recentReportsList');
+            
+            // Show loading state
+            recentReportsList.innerHTML = `
+                <div class="loading-state" style="padding: 20px; text-align: center; color: #6b7280;">
+                    <div style="display: inline-block; width: 20px; height: 20px; border: 2px solid #e5e7eb; border-radius: 50%; border-top-color: #3b82f6; animation: spin 1s ease-in-out infinite; margin-bottom: 8px;"></div>
+                    <div>Loading reports...</div>
+                </div>
+            `;
+            
+            try {
+                // Fetch collection requests with pending status
+                const snapshot = await db.collection('collections')
+                    .where('status', '==', 'pending')
+                    .limit(4)
+                    .get();
+                
+                console.log('Recent reports snapshot received, size:', snapshot.size);
+                
+                if (snapshot.empty) {
+                    recentReportsList.innerHTML = `
+                        <div class="empty-state" style="padding: 40px 20px; text-align: center; color: #6b7280;">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 16px; opacity: 0.5;">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14,2 14,8 20,8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10,9 9,9 8,9"></polyline>
+                            </svg>
+                            <div style="font-weight: 500; margin-bottom: 4px;">No Pending Reports</div>
+                            <div style="font-size: 14px;">Pending reports will appear here when submitted by users</div>
+                        </div>
+                    `;
+                    
+                    // Update total reports count
+                    document.getElementById('totalReports').textContent = '0';
+                    return;
+                }
+                
+                let html = '';
+                let totalCount = 0;
+                
+                // Process each report with proper user lookup
+                for (const doc of snapshot.docs) {
+                    const report = doc.data();
+                    totalCount++;
+                    
+                    // Get proper date
+                    const createdDate = report.created_at ? 
+                        (report.created_at.toDate ? report.created_at.toDate() : new Date(report.created_at)) : 
+                        (report.createdAt ? 
+                            (report.createdAt.toDate ? report.createdAt.toDate() : new Date(report.createdAt)) : 
+                            new Date());
+                    const timeAgo = getTimeAgo(createdDate);
+                    
+                    // Get user information with proper lookup (same logic as report management)
+                    let userName = 'Unknown User';
+                    try {
+                        if (report.user_id) {
+                            console.log('Fetching user data for user_id:', report.user_id);
+                            
+                            // Try to get user by document ID first
+                            const userDoc = await db.collection('users').doc(report.user_id).get();
+                            if (userDoc.exists) {
+                                const userData = userDoc.data();
+                                console.log('User data found:', userData);
+                                userName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.email || userData.name || 'Unknown User';
+                            } else {
+                                // If not found by document ID, try by field
+                                const userQuery = await db.collection('users').where('id', '==', report.user_id).get();
+                                if (!userQuery.empty) {
+                                    const userData = userQuery.docs[0].data();
+                                    console.log('User data found by field:', userData);
+                                    userName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.email || userData.name || 'Unknown User';
+                                }
+                            }
+                            console.log('Final user name:', userName);
+                        }
+                    } catch (userError) {
+                        console.log('Could not fetch user data:', userError);
+                        // Fallback to showing user ID if we can't get the name
+                        if (report.user_id) {
+                            userName = `User ${report.user_id.substring(0, 8)}`;
+                        }
+                    }
+                    
+                    // Get proper location display (same logic as report management)
+                    let userLocation = 'Location not specified';
+                    
+                    // Check various possible address field names
+                    const possibleAddressFields = [
+                        'address', 'location', 'full_address', 'street_address', 
+                        'pickup_address', 'collection_address', 'user_address',
+                        'address_line', 'street', 'street_address_line'
+                    ];
+                    
+                    for (const field of possibleAddressFields) {
+                        if (report[field] && report[field].trim() !== '' && 
+                            !report[field].match(/^-?\d+\.?\d*,\s*-?\d+\.?\d*$/)) {
+                            // Found a valid address field that's not just coordinates
+                            userLocation = report[field];
+                            break;
+                        }
+                    }
+                    
+                    // If no address found, check if we have coordinates and try barangay
+                    if (userLocation === 'Location not specified') {
+                        if (report.barangay) {
+                            userLocation = `Barangay ${report.barangay}`;
+                        } else if (report.city || report.municipality) {
+                            userLocation = report.city || report.municipality;
+                        } else if (report.latitude && report.longitude) {
+                            userLocation = 'Valenzuela City';
+                        }
+                    }
+                    
+                    const wasteType = report.waste_type || report.wasteType || 'General Waste';
+                    
+                    // Status badge styling
+                    const statusClass = 'pending';
+                    const statusColor = '#f59e0b'; // Orange for pending
+                    
+                    html += `
+                        <div class="recent-item" style="padding: 12px 0; border-bottom: 1px solid #f3f4f6; cursor: pointer;" onclick="viewReportDetails('${doc.id}')">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+                                <div style="font-weight: 500; color: #111827; font-size: 14px; flex: 1; margin-right: 8px;">
+                                    Collection Request - ${wasteType}
+                                </div>
+                                <div style="display: inline-block; background: ${statusColor}; color: white; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 10px; text-transform: uppercase;">
+                                    Pending
+                                </div>
+                            </div>
+                            <div style="color: #6b7280; font-size: 12px; line-height: 1.4;">
+                                <div><strong>User:</strong> ${userName}</div>
+                                <div><strong>Location:</strong> ${userLocation}</div>
+                                <div><strong>Reported:</strong> ${timeAgo}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Get total count of all pending reports for the stats
+                try {
+                    const countSnapshot = await db.collection('collections')
+                        .where('status', '==', 'pending')
+                        .get();
+                    document.getElementById('totalReports').textContent = countSnapshot.size;
+                } catch (error) {
+                    console.error('Error counting total reports:', error);
+                }
+                
+                recentReportsList.innerHTML = html;
+                console.log('Recent reports loaded successfully with', totalCount, 'reports');
+                
+            } catch (error) {
+                console.error('Error loading recent reports:', error);
+                recentReportsList.innerHTML = `
+                    <div class="error-state" style="padding: 20px; text-align: center; color: #ef4444;">
+                        <div style="font-weight: 500; margin-bottom: 4px;">Error Loading Reports</div>
+                        <div style="font-size: 14px; margin-bottom: 12px;">Unable to load reports. Please try again.</div>
+                        <button onclick="loadRecentReports()" style="padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        // Helper function to get time ago string
+        function getTimeAgo(date) {
+            const now = new Date();
+            const diffInSeconds = Math.floor((now - date) / 1000);
+            
+            if (diffInSeconds < 60) {
+                return 'Just now';
+            } else if (diffInSeconds < 3600) {
+                const minutes = Math.floor(diffInSeconds / 60);
+                return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+            } else if (diffInSeconds < 86400) {
+                const hours = Math.floor(diffInSeconds / 3600);
+                return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+            } else {
+                const days = Math.floor(diffInSeconds / 86400);
+                return `${days} day${days > 1 ? 's' : ''} ago`;
+            }
+        }
+        
+        // Function to view report details (redirect to report management)
+        function viewReportDetails(reportId) {
+            window.location.href = `report-management.php?reportId=${reportId}`;
+        }
+
         // Initialize map when page loads
         document.addEventListener('DOMContentLoaded', function() {
             initMap();
             loadUserCounts(); // Load user role counts
             loadAllAnnouncements(); // Load all announcements
+            loadRecentReports(); // Load recent pending reports
             
             // Setup toggle button event listener
             document.getElementById('toggleUserView').addEventListener('click', toggleUserBreakdown);
@@ -1604,6 +1800,9 @@
             
             // Set up periodic cleanup every hour
             setInterval(cleanupExpiredAnnouncements, 60 * 60 * 1000);
+            
+            // Auto-refresh recent reports every 30 seconds
+            setInterval(loadRecentReports, 30000);
         });
     </script>
 </body>
