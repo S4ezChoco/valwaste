@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
+import '../../utils/barangay_data.dart';
 import '../../services/firebase_auth_service.dart';
+import '../../models/user.dart';
 import '../home/home_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -18,6 +20,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
+  String? _selectedBarangay;
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -35,19 +38,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    if (_selectedBarangay == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select your barangay'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Use full registration method that saves to Firestore
+      // Use full registration method that saves to Firestore with resident role
       final result = await FirebaseAuthService.register(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
         phone: _phoneController.text.trim(),
         address: _addressController.text.trim(),
+        barangay: _selectedBarangay,
+        role: UserRole.resident, // Default role for new registrations
       );
 
       if (result['success']) {
@@ -251,6 +266,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your address';
+                    }
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: AppSizes.paddingMedium),
+
+                // Barangay Dropdown Field
+                DropdownButtonFormField<String>(
+                  value: _selectedBarangay,
+                  decoration: InputDecoration(
+                    labelText: 'Barangay',
+                    prefixIcon: const Icon(Icons.location_city),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppSizes.radiusMedium,
+                      ),
+                    ),
+                  ),
+                  hint: const Text('Select your barangay'),
+                  items: BarangayData.valenzuelaBarangays.map((String barangay) {
+                    return DropdownMenuItem<String>(
+                      value: barangay,
+                      child: Text(barangay),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedBarangay = newValue;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select your barangay';
                     }
                     return null;
                   },

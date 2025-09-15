@@ -4,20 +4,22 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import '../../utils/constants.dart';
-import '../../services/firebase_collection_service.dart';
-import '../../services/location_tracking_service.dart';
+import '../../utils/barangay_data.dart';
 import '../../services/firebase_auth_service.dart';
+import '../../services/firebase_collection_service.dart';
+import '../../services/location_service.dart';
+import '../../services/location_tracking_service.dart';
 import '../../services/route_optimization_service.dart';
-import '../../models/waste_collection.dart';
 import '../../models/user.dart';
+import '../../models/waste_collection.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -496,11 +498,13 @@ class _MapScreenState extends State<MapScreen>
                                   ),
                                 ),
                                 Text(
-                                  '${_driverLocation!.latitude.toStringAsFixed(4)}, ${_driverLocation!.longitude.toStringAsFixed(4)}',
+                                  BarangayData.getNearestBarangay(
+                                    _driverLocation!.latitude,
+                                    _driverLocation!.longitude,
+                                  ),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
-                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 const SizedBox(height: 4),

@@ -419,6 +419,45 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
 
+                          const SizedBox(height: 16),
+
+                          // Register Button
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const RegisterScreen(),
+                                  ),
+                                );
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(
+                                  color: Color(0xFF00C853),
+                                  width: 2,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 20,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: const Text(
+                                'REGISTER',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Poppins',
+                                  letterSpacing: 0.5,
+                                  color: Color(0xFF00C853),
+                                ),
+                              ),
+                            ),
+                          ),
+
                           const SizedBox(height: 24),
 
                           // Forgot Password Link - EXACTLY like screenshot

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/constants.dart';
+import '../../utils/barangay_data.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/firebase_collection_service.dart';
 import '../../services/route_optimization_service.dart';
@@ -17,11 +19,14 @@ class DriverDashboardScreen extends StatefulWidget {
 
 class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
   List<WasteCollection> _scheduledCollections = [];
+  Map<String, dynamic>? _latestSchedule;
+  bool _isLoadingSchedule = true;
 
   @override
   void initState() {
     super.initState();
     _loadScheduledCollections();
+    _loadLatestSchedule();
   }
 
   @override
@@ -80,41 +85,55 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
     );
   }
 
-  String _getLocationDisplayName(String address) {
-    // If address contains coordinates, return a generic location name
-    if (address.contains(',') &&
-        RegExp(r'^-?\d+\.?\d*,\s*-?\d+\.?\d*$').hasMatch(address.trim())) {
-      return 'Collection Point';
-    }
+  Future<void> _loadLatestSchedule() async {
+    try {
+      final currentUser = FirebaseAuthService.currentUser;
+      if (currentUser == null) return;
 
-    // If address contains "Collection Point", use that
-    if (address.toLowerCase().contains('collection point')) {
-      return address;
-    }
+      // Query truck_schedule collection for driver's latest schedule
+      final scheduleQuery = await FirebaseFirestore.instance
+          .collection('truck_schedule')
+          .where('driverId', isEqualTo: currentUser.id)
+          .where('status', whereIn: ['pending', 'in_progress'])
+          .orderBy('date', descending: false)
+          .orderBy('startTime', descending: false)
+          .limit(1)
+          .get();
 
-    // If address contains "Valenzuela City", extract the main part
-    if (address.toLowerCase().contains('valenzuela city')) {
-      final parts = address.split(',');
-      if (parts.length > 1) {
-        return parts[0].trim();
+      if (scheduleQuery.docs.isNotEmpty) {
+        setState(() {
+          _latestSchedule = scheduleQuery.docs.first.data();
+          _latestSchedule!['id'] = scheduleQuery.docs.first.id;
+          _isLoadingSchedule = false;
+        });
+      } else {
+        setState(() {
+          _isLoadingSchedule = false;
+        });
       }
+    } catch (e) {
+      print('Error loading latest schedule: $e');
+      setState(() {
+        _isLoadingSchedule = false;
+      });
     }
+  }
 
-    // For other addresses, take the first part before comma or use full address if short
-    if (address.contains(',')) {
-      final parts = address.split(',');
-      final firstPart = parts[0].trim();
-      return firstPart.length > 20
-          ? '${firstPart.substring(0, 20)}...'
-          : firstPart;
+  String _getLocationDisplayName(String address) {
+    // Use BarangayData utility to format location
+    return BarangayData.formatLocationDisplay(address);
+  }
+
+  void _navigateToScheduleLocation() {
+    if (_latestSchedule != null && _latestSchedule!['location'] != null) {
+      // Navigate to map with schedule location
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const MapScreen(),
+        ),
+      );
     }
-
-    // If address is too long, truncate it
-    if (address.length > 25) {
-      return '${address.substring(0, 25)}...';
-    }
-
-    return address;
   }
 
   @override
@@ -227,6 +246,144 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
               ],
             ),
           ),
+
+          // Latest Schedule Card (from admin panel)
+          if (!_isLoadingSchedule && _latestSchedule != null)
+            Positioned(
+              top: 200,
+              left: AppSizes.paddingLarge,
+              right: AppSizes.paddingLarge,
+              child: GestureDetector(
+                onTap: _navigateToScheduleLocation,
+                child: Container(
+                  padding: const EdgeInsets.all(AppSizes.paddingMedium),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary,
+                        AppColors.primary.withOpacity(0.8),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.local_shipping,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                          const SizedBox(width: AppSizes.paddingSmall),
+                          Expanded(
+                            child: Text(
+                              'Today\'s Schedule',
+                              style: AppTextStyles.heading3.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.touch_app,
+                                  color: Colors.white,
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Tap to Navigate',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSizes.paddingMedium),
+                      // Truck and Time Info
+                      Row(
+                        children: [
+                          Icon(Icons.access_time, color: Colors.white70, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${_latestSchedule!['startTime'] ?? 'N/A'} - ${_latestSchedule!['endTime'] ?? 'N/A'}',
+                            style: AppTextStyles.body2.copyWith(color: Colors.white),
+                          ),
+                          const SizedBox(width: AppSizes.paddingMedium),
+                          Icon(Icons.fire_truck, color: Colors.white70, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            _latestSchedule!['truck'] ?? 'No Truck Assigned',
+                            style: AppTextStyles.body2.copyWith(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSizes.paddingSmall),
+                      // Location
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, color: Colors.white70, size: 16),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              BarangayData.formatLocationDisplay(
+                                _latestSchedule!['location'] ?? 'Unknown',
+                              ),
+                              style: AppTextStyles.body2.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Streets if available
+                      if (_latestSchedule!['streets'] != null &&
+                          (_latestSchedule!['streets'] as List).isNotEmpty) ...[
+                        const SizedBox(height: AppSizes.paddingSmall),
+                        Text(
+                          'Routes: ${(_latestSchedule!['streets'] as List).take(2).join(', ')}${(_latestSchedule!['streets'] as List).length > 2 ? ' +${(_latestSchedule!['streets'] as List).length - 2} more' : ''}',
+                          style: AppTextStyles.caption.copyWith(
+                            color: Colors.white70,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
           // Announcement Overlay (if there are announcements)
           Positioned(

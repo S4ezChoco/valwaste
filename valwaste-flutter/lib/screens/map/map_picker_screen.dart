@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../utils/constants.dart';
+import '../../utils/barangay_data.dart';
 
 class MapPickerScreen extends StatefulWidget {
   final double? initialLatitude;
@@ -228,10 +229,9 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${_selectedLocation!.latitude.toStringAsFixed(6)}, ${_selectedLocation!.longitude.toStringAsFixed(6)}',
+                                  BarangayData.getNearestBarangay(_selectedLocation!.latitude, _selectedLocation!.longitude),
                                   style: AppTextStyles.caption.copyWith(
                                     color: AppColors.textSecondary,
-                                    fontFamily: 'monospace',
                                   ),
                                 ),
                               ],

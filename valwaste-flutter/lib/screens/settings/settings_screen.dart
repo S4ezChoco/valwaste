@@ -194,18 +194,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: AppSizes.paddingLarge),
 
-                  // Privacy & Location Settings
-                  Text(
-                    'Privacy & Location',
-                    style: AppTextStyles.heading3.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                  // Privacy & Location Settings - Only show for drivers
+                  if (_currentUser?.role == UserRole.driver) ...[
+                    Text(
+                      'Privacy & Location',
+                      style: AppTextStyles.heading3.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSizes.paddingMedium),
+                    const SizedBox(height: AppSizes.paddingMedium),
 
-                  // GPS Tracking Setting
-                  Container(
+                    // GPS Tracking Setting - Only for drivers
+                    Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(AppSizes.paddingMedium),
                     decoration: BoxDecoration(
@@ -343,7 +344,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: AppSizes.paddingLarge),
+                    const SizedBox(height: AppSizes.paddingLarge),
+                  ], // End of driver-only GPS settings
 
                   // Notification Settings
                   Text(

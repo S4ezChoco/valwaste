@@ -17,23 +17,24 @@ class FirebaseAuthService {
   static Stream<User?> get authStateChanges => _auth.authStateChanges();
 
   // Initialize the service
-  static Future<void> initialize() async {
-    try {
-      // Listen to auth state changes and update current user
-      _auth.authStateChanges().listen((User? firebaseUser) async {
-        if (firebaseUser != null) {
-          // User is signed in, fetch user data from Firestore
+  static void initialize() {
+    print('Firebase Auth Service initialized');
+    // Listen to auth state changes
+    _auth.authStateChanges().listen((User? firebaseUser) async {
+      if (firebaseUser != null && _currentUser == null) {
+        // Only fetch if we don't already have user data (avoids registration interference)
+        try {
           await _fetchUserFromFirestore(firebaseUser.uid);
-        } else {
-          // User is signed out
-          _currentUser = null;
+        } catch (e) {
+          print('Auth state listener - error fetching user data: $e');
+          // Don't set _currentUser to null here, keep any existing user data
         }
-      });
-
-      print('Firebase Auth Service initialized successfully');
-    } catch (e) {
-      print('Error initializing Firebase Auth Service: $e');
-    }
+      } else if (firebaseUser == null) {
+        // User is signed out
+        _currentUser = null;
+        print('User signed out, cleared current user data');
+      }
+    });
   }
 
   // Fetch user data from Firestore
@@ -58,11 +59,62 @@ class FirebaseAuthService {
 
       print('Searching for user with email: $email');
 
-      // Search by email instead of UID
-      final userQuery = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: email)
-          .get();
+      // Search by email instead of UID with error handling
+      late QuerySnapshot userQuery;
+      try {
+        userQuery = await _firestore
+            .collection('users')
+            .where('email', isEqualTo: email)
+            .get();
+      } catch (queryError) {
+        print('Error during Firestore query: $queryError');
+        print('Query error type: ${queryError.runtimeType}');
+        
+        // Handle PigeonUserDetails error in query
+        if (queryError.toString().contains('PigeonUserDetails') || 
+            queryError.toString().contains('pigeonUser') ||
+            queryError.toString().contains('List<Object?>')) {
+          print('PigeonUserDetails error in query - attempting fallback');
+          
+          // Try alternative query approach
+          try {
+            userQuery = await _firestore
+                .collection('users')
+                .get();
+            
+            // Filter manually by email
+            final matchingDocs = userQuery.docs.where((doc) {
+              final data = doc.data() as Map<String, dynamic>?;
+              return data != null && data['email'] == email;
+            }).toList();
+            
+            // Create a mock QuerySnapshot with filtered results
+            if (matchingDocs.isNotEmpty) {
+              print('Found user via fallback method');
+              final doc = matchingDocs.first;
+              final data = doc.data() as Map<String, dynamic>;
+              
+              if (data.containsKey('email')) {
+                try {
+                  _currentUser = UserModel.fromFirestore(doc);
+                  print('User data fetched via fallback: ${_currentUser!.name}');
+                  return;
+                } catch (parseError) {
+                  print('Error parsing user data in fallback: $parseError');
+                }
+              }
+            }
+          } catch (fallbackError) {
+            print('Fallback query also failed: $fallbackError');
+          }
+          
+          _currentUser = null;
+          return;
+        }
+        
+        // Re-throw non-PigeonUserDetails errors
+        rethrow;
+      }
 
       print('Query result: ${userQuery.docs.length} documents found');
 
@@ -73,7 +125,7 @@ class FirebaseAuthService {
       }
 
       final doc = userQuery.docs.first;
-      final data = doc.data();
+      final data = doc.data() as Map<String, dynamic>?;
       print('Raw Firestore data: $data');
       print('Document ID: ${doc.id}');
 
@@ -112,8 +164,18 @@ class FirebaseAuthService {
     } catch (e) {
       print('Error fetching user from Firestore: $e');
       print('Error type: ${e.runtimeType}');
+      
+      // Handle PigeonUserDetails error specifically
+      if (e.toString().contains('PigeonUserDetails') || 
+          e.toString().contains('pigeonUser') ||
+          e.toString().contains('List<Object?>')) {
+        print('Detected PigeonUserDetails casting error - continuing without re-throwing');
+        _currentUser = null;
+        return; // Don't re-throw this specific error
+      }
+      
       _currentUser = null;
-      rethrow; // Re-throw to be caught by the calling method
+      rethrow; // Re-throw other errors to be caught by the calling method
     }
   }
 
@@ -130,21 +192,8 @@ class FirebaseAuthService {
     try {
       print('Starting registration for: $email with role: ${role.name}');
 
-      // Check if email already exists in Firestore
-      final existingUser = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: email)
-          .get();
-
-      if (existingUser.docs.isNotEmpty) {
-        return {
-          'success': false,
-          'message':
-              'An account already exists for that email. Please login instead.',
-        };
-      }
-
-      // Create user with Firebase Auth
+      // Skip existing user check to avoid PigeonUserDetails error
+      // Create user with Firebase Auth directly
       final UserCredential userCredential = await _auth
           .createUserWithEmailAndPassword(email: email, password: password);
 
@@ -205,14 +254,14 @@ class FirebaseAuthService {
         updatedAt: DateTime.now(),
       );
 
-      // Set current user
+      // Set current user directly - avoid any Firestore queries during registration
       _currentUser = userModel;
+      print('Registration completed with local user model');
 
-      print('Registration completed successfully');
       return {
         'success': true,
         'message': 'Account created successfully! Welcome to ValWaste!',
-        'user': userModel,
+        'user': _currentUser,
       };
     } on FirebaseAuthException catch (e) {
       print(
@@ -400,35 +449,46 @@ class FirebaseAuthService {
           print('Error type: ${authError.runtimeType}');
 
           // Handle the specific error we're seeing
-          if (authError.toString().contains('PigeonUserDetails')) {
+          if (authError.toString().contains('PigeonUserDetails') || 
+              authError.toString().contains('pigeonUser')) {
             print(
               'Detected PigeonUserDetails error, attempting to continue...',
             );
+            // Wait a moment for auth state to settle
+            await Future.delayed(const Duration(milliseconds: 1000));
+            
             // Try to continue with login despite this error
             try {
               // Get current Firebase user
               final currentUser = _auth.currentUser;
-              if (currentUser != null) {
+              if (currentUser != null && currentUser.email != null) {
+                print('Firebase user found after PigeonUser error: ${currentUser.email}');
                 // Force fetch user data after successful auth
                 await _fetchUserFromFirestore(currentUser.uid);
-                return {
-                  'success': true,
-                  'message': 'Login successful',
-                  'user': _currentUser,
-                };
+                
+                if (_currentUser != null) {
+                  return {
+                    'success': true,
+                    'message': 'Login successful! Welcome back, ${_currentUser!.name}!',
+                    'user': _currentUser,
+                  };
+                } else {
+                  return {
+                    'success': false,
+                    'message': 'Authentication successful but user data not found. Please contact admin.',
+                  };
+                }
               } else {
                 return {
                   'success': false,
-                  'message':
-                      'Login successful but unable to load user data. Please try again.',
+                  'message': 'Authentication failed. Please try again.',
                 };
               }
             } catch (fetchError) {
-              print('Error fetching user data: $fetchError');
+              print('Error fetching user data after PigeonUser error: $fetchError');
               return {
                 'success': false,
-                'message':
-                    'Login successful but unable to load user data. Please try again.',
+                'message': 'Authentication successful but unable to load user data. Please restart the app.',
               };
             }
           }

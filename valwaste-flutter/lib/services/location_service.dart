@@ -1,6 +1,7 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/barangay_data.dart';
 
 class LocationService {
   static const String _gpsTrackingKey = 'gps_tracking_enabled';
@@ -178,7 +179,10 @@ class LocationService {
         return 'Location not available (GPS tracking may be disabled)';
       }
 
-      return '${coordinates['latitude']!.toStringAsFixed(6)}, ${coordinates['longitude']!.toStringAsFixed(6)}';
+      return BarangayData.getNearestBarangay(
+        coordinates['latitude']!, 
+        coordinates['longitude']!
+      );
     } catch (e) {
       return 'Error getting location: $e';
     }

@@ -14,7 +14,7 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Initialize Firebase Auth Service
-  await FirebaseAuthService.initialize();
+  FirebaseAuthService.initialize();
 
   runApp(const MyApp());
 }

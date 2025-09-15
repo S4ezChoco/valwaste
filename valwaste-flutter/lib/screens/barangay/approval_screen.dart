@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
+import '../../utils/barangay_data.dart';
 import '../../models/waste_collection.dart';
 import '../../services/collection_approval_service.dart';
-import '../../services/firebase_auth_service.dart';
 
 class ApprovalScreen extends StatefulWidget {
   const ApprovalScreen({super.key});
@@ -342,15 +342,15 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
               ],
             ),
 
-            // Location coordinates
+            // Location information
             if (request.latitude != null && request.longitude != null) ...[
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.gps_fixed, color: Colors.grey, size: 16),
+                  const Icon(Icons.location_on, color: Colors.grey, size: 16),
                   const SizedBox(width: 4),
                   Text(
-                    'Lat: ${request.latitude!.toStringAsFixed(6)}, Lng: ${request.longitude!.toStringAsFixed(6)}',
+                    'Location: ${BarangayData.getNearestBarangay(request.latitude!, request.longitude!)}',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],

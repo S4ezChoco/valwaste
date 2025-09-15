@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
+import '../../utils/barangay_data.dart';
 import '../../models/waste_collection.dart';
 import '../../models/user.dart';
 import '../../services/advanced_scheduling_service.dart';
@@ -199,17 +200,20 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
         _isGettingLocation = false;
       });
 
-      // Auto-fill address field with coordinates
+      // Auto-fill address field with nearest barangay name
       if (mounted) {
-        _addressController.text =
-            '${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}';
+        final nearestBarangay = BarangayData.getNearestBarangay(
+          position.latitude, 
+          position.longitude
+        );
+        _addressController.text = nearestBarangay;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Location captured! Address field filled with coordinates.',
+              'Location captured! Nearest location: $nearestBarangay',
             ),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
           ),
         );
       }

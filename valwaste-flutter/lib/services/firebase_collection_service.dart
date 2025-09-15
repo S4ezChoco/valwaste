@@ -89,7 +89,7 @@ class FirebaseCollectionService {
     }
   }
 
-  // Get user's collection history
+  // Get user's collection history (filtered by barangay for residents/barangay officials)
   static Future<List<WasteCollection>> getUserCollections() async {
     try {
       if (FirebaseAuthService.currentUser == null) {
@@ -97,7 +97,10 @@ class FirebaseCollectionService {
         return [];
       }
 
-      final userId = FirebaseAuthService.currentUser!.id;
+      final currentUser = FirebaseAuthService.currentUser!;
+      final userId = currentUser.id;
+      final userRole = currentUser.role;
+      final userBarangay = currentUser.barangay;
       print('🔍 Fetching collections for user: $userId');
       print('🔍 User ID type: ${userId.runtimeType}');
       print('🔍 User ID length: ${userId.length}');
@@ -111,16 +114,25 @@ class FirebaseCollectionService {
         '📄 Total collections in database: ${allCollectionsSnapshot.docs.length}',
       );
 
-      for (var doc in allCollectionsSnapshot.docs) {
-        final data = doc.data();
-        print(
-          '📋 Collection ${doc.id}: user_id = "${data['user_id']}" (type: ${data['user_id'].runtimeType})',
-        );
+      // Determine query based on user role
+      Query<Map<String, dynamic>> query;
+      
+      if (userRole == UserRole.resident) {
+        // Residents see only their own requests
+        query = _firestore
+            .collection('collections')
+            .where('user_id', isEqualTo: userId);
+      } else if (userRole == UserRole.barangayOfficial) {
+        // Barangay officials see only requests from their barangay
+        query = _firestore
+            .collection('collections')
+            .where('barangay', isEqualTo: userBarangay);
+      } else {
+        // Drivers and administrators see all requests
+        query = _firestore.collection('collections');
       }
 
-      final querySnapshot = await _firestore
-          .collection('collections')
-          .where('user_id', isEqualTo: userId)
+      final querySnapshot = await query
           .orderBy('created_at', descending: true)
           .get();
 
