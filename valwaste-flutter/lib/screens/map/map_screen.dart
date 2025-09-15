@@ -392,6 +392,12 @@ class _MapScreenState extends State<MapScreen>
                     initialCenter:
                         _currentLocation ?? const LatLng(14.7000, 120.9833),
                     initialZoom: 12.0,
+                    minZoom: 8.0,  // Limit zoom out to Philippines area only
+                    maxZoom: 18.0, // Prevent zooming in too much to avoid white screen
+                    interactionOptions: const InteractionOptions(
+                      flags: InteractiveFlag.all,
+                      enableMultiFingerGestureRace: true,
+                    ),
                     onTap: (_, __) {
                       // Handle map tap if needed
                     },
@@ -2143,7 +2149,7 @@ class _MapScreenState extends State<MapScreen>
   void _zoomIn() {
     if (_mapController != null) {
       final currentZoom = _mapController!.camera.zoom;
-      final newZoom = (currentZoom + 1).clamp(3.0, 19.0);
+      final newZoom = (currentZoom + 1).clamp(8.0, 18.0);
       _mapController!.move(_mapController!.camera.center, newZoom);
     }
   }
@@ -2152,7 +2158,7 @@ class _MapScreenState extends State<MapScreen>
   void _zoomOut() {
     if (_mapController != null) {
       final currentZoom = _mapController!.camera.zoom;
-      final newZoom = (currentZoom - 1).clamp(3.0, 19.0);
+      final newZoom = (currentZoom - 1).clamp(8.0, 18.0);
       _mapController!.move(_mapController!.camera.center, newZoom);
     }
   }
