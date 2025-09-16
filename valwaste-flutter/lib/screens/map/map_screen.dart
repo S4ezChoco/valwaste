@@ -15,7 +15,6 @@ import '../../utils/constants.dart';
 import '../../utils/barangay_data.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../services/firebase_collection_service.dart';
-import '../../services/location_service.dart';
 import '../../services/location_tracking_service.dart';
 import '../../services/route_optimization_service.dart';
 import '../../models/user.dart';
@@ -1328,7 +1327,7 @@ class _MapScreenState extends State<MapScreen>
             const SizedBox(width: 8),
             // Glowing truck icon
             GestureDetector(
-              onTap: () => _navigateToRequesterLocation(latestRequest),
+              onTap: () => _navigateToCurrentUserLocation(),
               child: TweenAnimationBuilder<double>(
                 duration: const Duration(seconds: 2),
                 tween: Tween(begin: 0.0, end: 1.0),
@@ -1634,7 +1633,7 @@ class _MapScreenState extends State<MapScreen>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      collection.address,
+                      BarangayData.formatLocationDisplay(collection.address),
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade700,
@@ -2214,8 +2213,47 @@ class _MapScreenState extends State<MapScreen>
         );
   }
 
+  /// Navigate to current user location
+  Future<void> _navigateToCurrentUserLocation() async {
+    try {
+      // Get current user location
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // Animate to current user location
+      _mapController?.move(
+        LatLng(position.latitude, position.longitude),
+        15.0, // Zoom level
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Navigated to your current location'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error getting current location: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to get your current location'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   /// Navigate to requester location
-  void _navigateToRequesterLocation(Map<String, dynamic> request) {
+  Future<void> _navigateToRequesterLocation(
+    Map<String, dynamic> latestRequest,
+  ) async {
     try {
       // Get the latest approved request with coordinates
       final approvedRequests = _collectionRequests
@@ -2475,7 +2513,76 @@ class _MapScreenState extends State<MapScreen>
     }
   }
 
-  /// Get latest approved collection request
+  /// Get today's scheduled collection for driver
+  Future<Map<String, dynamic>?> _getTodayScheduledCollection() async {
+    try {
+      final currentUser = FirebaseAuthService.currentUser;
+      if (currentUser == null) return null;
+
+      final today = DateTime.now();
+      final todayString =
+          '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+      print('🔄 Looking for today\'s schedule: $todayString for driver: ${currentUser.id}');
+
+      // Query for today's scheduled collections - same logic as driver_collections_screen
+      QuerySnapshot? querySnapshot;
+
+      // Try different field combinations for scheduled collections
+      try {
+        querySnapshot = await FirebaseFirestore.instance
+            .collection('collections')
+            .where('status', isEqualTo: 'scheduled')
+            .where('assigned_to', isEqualTo: currentUser.id)
+            .where('scheduledDate', isEqualTo: todayString)
+            .limit(1)
+            .get();
+
+        if (querySnapshot.docs.isEmpty) {
+          querySnapshot = await FirebaseFirestore.instance
+              .collection('collections')
+              .where('status', isEqualTo: 'approved')
+              .where('assigned_to', isEqualTo: currentUser.id)
+              .where('scheduledDate', isEqualTo: todayString)
+              .limit(1)
+              .get();
+        }
+
+        if (querySnapshot.docs.isEmpty) {
+          querySnapshot = await FirebaseFirestore.instance
+              .collection('collections')
+              .where('assigned_to', isEqualTo: currentUser.id)
+              .where('scheduled_date', isEqualTo: todayString)
+              .limit(1)
+              .get();
+        }
+      } catch (e) {
+        print('Error querying today\'s schedule: $e');
+      }
+
+      if (querySnapshot != null && querySnapshot.docs.isNotEmpty) {
+        final scheduleData = querySnapshot.docs.first.data() as Map<String, dynamic>;
+        print('✅ Found today\'s scheduled collection');
+        
+        return {
+          'location': BarangayData.formatLocationDisplay(scheduleData['address'] ?? ''),
+          'date': scheduleData['scheduledDate'] ?? scheduleData['scheduled_date'] ?? todayString,
+          'wasteType': scheduleData['waste_type'] ?? 'General',
+          'user_name': scheduleData['user_name'] ?? 'Unknown',
+          'latitude': scheduleData['latitude'],
+          'longitude': scheduleData['longitude'],
+        };
+      }
+
+      print('❌ No scheduled collection found for today');
+      return null;
+    } catch (e) {
+      print('Error getting today\'s scheduled collection: $e');
+      return null;
+    }
+  }
+
+  /// Get latest approved collection request (fallback)
   Map<String, dynamic> _getLatestApprovedRequest() {
     print('Total collection requests: ${_collectionRequests.length}');
 
@@ -2491,15 +2598,8 @@ class _MapScreenState extends State<MapScreen>
       approvedRequests.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       final latest = approvedRequests.first;
 
-      // Format the address properly
-      print('Original address from collection request: "${latest.address}"');
-      print('Address length: ${latest.address.length}');
-      print('Address is empty: ${latest.address.isEmpty}');
-      String displayAddress = _formatAddressForDisplay(latest.address);
-      print('Formatted address: "$displayAddress"');
-
       return {
-        'location': displayAddress,
+        'location': BarangayData.formatLocationDisplay(latest.address),
         'date': _formatCollectionDate(latest.scheduledDate),
         'wasteType': latest.wasteType.toString().split('.').last,
       };
@@ -2511,15 +2611,8 @@ class _MapScreenState extends State<MapScreen>
       _collectionRequests.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       final latest = _collectionRequests.first;
 
-      print('Latest request status: ${latest.status}');
-      print('Original address from latest request: "${latest.address}"');
-      print('Address length: ${latest.address.length}');
-      print('Address is empty: ${latest.address.isEmpty}');
-      String displayAddress = _formatAddressForDisplay(latest.address);
-      print('Formatted address: "$displayAddress"');
-
       return {
-        'location': displayAddress,
+        'location': BarangayData.formatLocationDisplay(latest.address),
         'date': _formatCollectionDate(latest.scheduledDate),
         'wasteType': latest.wasteType.toString().split('.').last,
       };
@@ -3813,7 +3906,7 @@ class _AllCollectionRequestsModalState
               const SizedBox(height: 16),
               // Address
               Text(
-                request.address,
+                BarangayData.formatLocationDisplay(request.address),
                 style: AppTextStyles.body1.copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,

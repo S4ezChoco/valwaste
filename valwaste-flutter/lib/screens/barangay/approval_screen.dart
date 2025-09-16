@@ -322,7 +322,7 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    request.address,
+                    BarangayData.formatLocationDisplay(request.address),
                     style: const TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                 ),
@@ -481,7 +481,7 @@ class _ApprovalDialogState extends State<_ApprovalDialog> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  widget.request.address,
+                  BarangayData.formatLocationDisplay(widget.request.address),
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],

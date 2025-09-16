@@ -968,16 +968,17 @@ class _DriverCollectionsScreenState extends State<DriverCollectionsScreen> {
                 if (schedule['waste_type'] != null)
                   _buildScheduleRow('Waste Type', schedule['waste_type']),
 
-                // Address
+                // Address (convert coordinates to barangay name)
                 if (schedule['address'] != null)
-                  _buildScheduleRow('Address', schedule['address']),
-
-                // Coordinates
+                  _buildScheduleRow('Address', BarangayData.formatLocationDisplay(schedule['address'])),
                 if (schedule['latitude'] != null &&
-                    schedule['longitude'] != null)
+                    schedule['longitude'] != null && schedule['address'] == null)
                   _buildScheduleRow(
-                    'Coordinates',
-                    '${schedule['latitude']}, ${schedule['longitude']}',
+                    'Address',
+                    BarangayData.getNearestBarangay(
+                      double.tryParse(schedule['latitude'].toString()) ?? 0.0,
+                      double.tryParse(schedule['longitude'].toString()) ?? 0.0,
+                    ),
                   ),
 
                 // Status
@@ -1486,7 +1487,7 @@ class _DriverCollectionsScreenState extends State<DriverCollectionsScreen> {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    collection.address,
+                    BarangayData.formatLocationDisplay(collection.address),
                     style: const TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                 ),

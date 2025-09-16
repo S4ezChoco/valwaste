@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
+import '../../utils/barangay_data.dart';
 import '../../services/driver_collection_service.dart';
 import '../../models/waste_collection.dart';
 
@@ -414,7 +415,7 @@ class _DriverReportScreenState extends State<DriverReportScreen> {
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  collection.address,
+                  BarangayData.formatLocationDisplay(collection.address),
                   style: AppTextStyles.body2.copyWith(
                     color: AppColors.textSecondary,
                   ),

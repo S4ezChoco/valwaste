@@ -119,10 +119,6 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
     }
   }
 
-  String _getLocationDisplayName(String address) {
-    // Use BarangayData utility to format location
-    return BarangayData.formatLocationDisplay(address);
-  }
 
   void _navigateToScheduleLocation() {
     if (_latestSchedule != null && _latestSchedule!['location'] != null) {
@@ -460,7 +456,7 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        _getLocationDisplayName(
+                                        BarangayData.formatLocationDisplay(
                                           request.address,
                                         ),
                                         style: AppTextStyles.body2.copyWith(

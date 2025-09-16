@@ -5,6 +5,8 @@ enum UserRole { resident, barangayOfficial, driver, collector, administrator }
 class UserModel {
   final String id;
   final String name;
+  final String? firstName;
+  final String? lastName;
   final String email;
   final String phone;
   final String address;
@@ -16,6 +18,8 @@ class UserModel {
   UserModel({
     required this.id,
     required this.name,
+    this.firstName,
+    this.lastName,
     required this.email,
     required this.phone,
     required this.address,
@@ -27,9 +31,13 @@ class UserModel {
 
   // Create from JSON
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    final firstName = json['firstName']?.toString();
+    final lastName = json['lastName']?.toString();
     return UserModel(
       id: json['id'] ?? '',
       name: _buildName(json),
+      firstName: firstName,
+      lastName: lastName,
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',
       address: json['address'] ?? '',
@@ -48,9 +56,13 @@ class UserModel {
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     try {
       final data = doc.data() as Map<String, dynamic>;
+      final firstName = data['firstName']?.toString();
+      final lastName = data['lastName']?.toString();
       return UserModel(
         id: doc.id,
         name: _buildName(data),
+        firstName: firstName,
+        lastName: lastName,
         email: data['email']?.toString() ?? '',
         phone: data['phone']?.toString() ?? '',
         address: data['address']?.toString() ?? '',
@@ -143,6 +155,8 @@ class UserModel {
     return {
       'id': id,
       'name': name,
+      'firstName': firstName,
+      'lastName': lastName,
       'email': email,
       'phone': phone,
       'address': address,
@@ -155,8 +169,7 @@ class UserModel {
 
   // Convert to Firestore document
   Map<String, dynamic> toFirestore() {
-    return {
-      'name': name,
+    final data = <String, dynamic>{
       'email': email,
       'phone': phone,
       'address': address,
@@ -165,12 +178,30 @@ class UserModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
+    
+    // Include firstName and lastName if available
+    if (firstName != null && firstName!.isNotEmpty) {
+      data['firstName'] = firstName;
+    }
+    if (lastName != null && lastName!.isNotEmpty) {
+      data['lastName'] = lastName;
+    }
+    
+    // Only include name field if firstName/lastName are not available
+    if ((firstName == null || firstName!.isEmpty) && 
+        (lastName == null || lastName!.isEmpty)) {
+      data['name'] = name;
+    }
+    
+    return data;
   }
 
   // Create a copy with updated fields
   UserModel copyWith({
     String? id,
     String? name,
+    String? firstName,
+    String? lastName,
     String? email,
     String? phone,
     String? address,
@@ -182,6 +213,8 @@ class UserModel {
     return UserModel(
       id: id ?? this.id,
       name: name ?? this.name,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
       email: email ?? this.email,
       phone: phone ?? this.phone,
       address: address ?? this.address,

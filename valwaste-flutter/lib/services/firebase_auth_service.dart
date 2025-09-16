@@ -16,11 +16,20 @@ class FirebaseAuthService {
   // Auth state changes stream
   static Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  // Flag to prevent auth state listener from interfering during registration
+  static bool _isRegistering = false;
+
   // Initialize the service
   static void initialize() {
     print('Firebase Auth Service initialized');
     // Listen to auth state changes
     _auth.authStateChanges().listen((User? firebaseUser) async {
+      // Skip auth state processing during registration
+      if (_isRegistering) {
+        print('Skipping auth state change during registration');
+        return;
+      }
+      
       if (firebaseUser != null && _currentUser == null) {
         // Only fetch if we don't already have user data (avoids registration interference)
         try {
@@ -181,7 +190,8 @@ class FirebaseAuthService {
 
   // Register new user with Firebase Auth and Firestore (with role support)
   static Future<Map<String, dynamic>> register({
-    required String name,
+    required String firstName,
+    required String lastName,
     required String email,
     required String password,
     required String phone,
@@ -191,6 +201,9 @@ class FirebaseAuthService {
   }) async {
     try {
       print('Starting registration for: $email with role: ${role.name}');
+      
+      // Set registration flag to prevent auth state listener interference
+      _isRegistering = true;
 
       // Skip existing user check to avoid PigeonUserDetails error
       // Create user with Firebase Auth directly
@@ -204,16 +217,18 @@ class FirebaseAuthService {
 
       print('Firebase Auth user created with UID: ${firebaseUser.uid}');
 
-      // Create user data for Firestore
+      // Create user data for Firestore - matching PHP admin structure
       final userData = {
-        'name': name,
+        'firstName': firstName,
+        'lastName': lastName,
         'email': email,
         'phone': phone,
         'address': address,
         'barangay': barangay ?? 'Valenzuela City',
-        'role': role.name,
+        'role': role == UserRole.resident ? 'Resident' : role.name,
         'createdAt': Timestamp.fromDate(DateTime.now()),
         'updatedAt': Timestamp.fromDate(DateTime.now()),
+        'isActive': true,
       };
 
       print('User data prepared for Firestore: $userData');
@@ -226,6 +241,9 @@ class FirebaseAuthService {
             .set(userData);
 
         print('User data saved to Firestore successfully');
+        
+        // Small delay to ensure Firestore write is committed
+        await Future.delayed(const Duration(milliseconds: 500));
       } catch (firestoreError) {
         print('Error saving to Firestore: $firestoreError');
         // If Firestore save fails, delete the Firebase Auth user
@@ -242,9 +260,12 @@ class FirebaseAuthService {
       }
 
       // Create user model for current user
+      final fullName = '$firstName $lastName'.trim();
       final userModel = UserModel(
         id: firebaseUser.uid,
-        name: name,
+        name: fullName,
+        firstName: firstName,
+        lastName: lastName,
         email: email,
         phone: phone,
         address: address,
@@ -286,6 +307,9 @@ class FirebaseAuthService {
       print('Unexpected error during registration: $e');
       print('Error type: ${e.runtimeType}');
       return {'success': false, 'message': 'An unexpected error occurred: $e'};
+    } finally {
+      // Always reset the registration flag
+      _isRegistering = false;
     }
   }
 
@@ -652,6 +676,8 @@ class FirebaseAuthService {
   // Update user profile
   static Future<Map<String, dynamic>> updateProfile({
     String? name,
+    String? firstName,
+    String? lastName,
     String? phone,
     String? address,
     String? barangay,
@@ -665,6 +691,8 @@ class FirebaseAuthService {
       // Update current user model using copyWith
       _currentUser = _currentUser!.copyWith(
         name: name,
+        firstName: firstName,
+        lastName: lastName,
         phone: phone,
         address: address,
         barangay: barangay,
@@ -850,6 +878,8 @@ class FirebaseAuthService {
   // Manually create user in Firestore for existing Auth user
   static Future<Map<String, dynamic>> createUserInFirestore({
     required String name,
+    String? firstName,
+    String? lastName,
     required String email,
     required String phone,
     required String address,
@@ -867,16 +897,28 @@ class FirebaseAuthService {
 
       print('Creating user in Firestore for UID: ${currentUser.uid}');
 
-      final userData = {
-        'name': name,
+      final userData = <String, dynamic>{
         'email': email,
         'phone': phone,
         'address': address,
         'barangay': barangay ?? 'Valenzuela City',
-        'role': role.name,
+        'role': role == UserRole.resident ? 'Resident' : role.name,
         'createdAt': Timestamp.fromDate(DateTime.now()),
         'updatedAt': Timestamp.fromDate(DateTime.now()),
+        'isActive': true,
       };
+      
+      // Add firstName and lastName if available
+      if (firstName != null && firstName.isNotEmpty) {
+        userData['firstName'] = firstName;
+      }
+      if (lastName != null && lastName.isNotEmpty) {
+        userData['lastName'] = lastName;
+      }
+      // Only add name field if firstName/lastName not available
+      if ((firstName == null || firstName.isEmpty) && (lastName == null || lastName.isEmpty)) {
+        userData['name'] = name;
+      }
 
       await _firestore.collection('users').doc(currentUser.uid).set(userData);
 
@@ -884,6 +926,8 @@ class FirebaseAuthService {
       _currentUser = UserModel(
         id: currentUser.uid,
         name: name,
+        firstName: firstName,
+        lastName: lastName,
         email: email,
         phone: phone,
         address: address,

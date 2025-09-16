@@ -4,6 +4,9 @@ import '../../services/firebase_auth_service.dart';
 import '../../models/user.dart';
 import '../auth/login_screen.dart';
 import '../settings/settings_screen.dart';
+import 'privacy_policy_screen.dart';
+import 'terms_conditions_screen.dart';
+import 'help_support_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -324,7 +327,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: 'Privacy Policy',
                       subtitle: 'Data protection',
                       onTap: () {
-                        // TODO: Navigate to privacy policy
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const PrivacyPolicyScreen(),
+                          ),
+                        );
                       },
                     ),
                     const SizedBox(height: 6),
@@ -334,7 +341,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: 'Terms and Conditions',
                       subtitle: 'Usage agreement',
                       onTap: () {
-                        // TODO: Navigate to terms and conditions
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const TermsConditionsScreen(),
+                          ),
+                        );
                       },
                     ),
                     const SizedBox(height: 6),
@@ -344,7 +355,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: 'Help & Support',
                       subtitle: 'Get assistance',
                       onTap: () {
-                        // TODO: Navigate to help
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const HelpSupportScreen(),
+                          ),
+                        );
                       },
                     ),
                   ],
