@@ -56,7 +56,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      // Use full registration method that saves to Firestore with resident role
+      // Use registration method for residents
       final result = await FirebaseAuthService.register(
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
@@ -65,7 +65,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         phone: _phoneController.text.trim(),
         address: _addressController.text.trim(),
         barangay: _selectedBarangay,
-        role: UserRole.resident, // Default role for new registrations
+        role: UserRole.resident,
       );
 
       if (result['success']) {
@@ -79,12 +79,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           );
 
-          // Small delay to ensure AuthWrapper detects the state change
-          await Future.delayed(const Duration(milliseconds: 500));
+          // Small delay to ensure everything is saved
+          await Future.delayed(const Duration(seconds: 1));
 
-          // Check if we're still on the register screen (AuthWrapper didn't work)
-          if (mounted && Navigator.of(context).canPop() == false) {
-            // Manual navigation as fallback
+          // Navigate to home screen
+          if (mounted) {
             Navigator.of(context).pushAndRemoveUntil(
               MaterialPageRoute(builder: (context) => const HomeScreen()),
               (route) => false,

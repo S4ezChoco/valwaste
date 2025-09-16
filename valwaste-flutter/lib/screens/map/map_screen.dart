@@ -1209,9 +1209,9 @@ class _MapScreenState extends State<MapScreen>
 
   /// Build Next Collection card
   Widget _buildNextCollectionCard() {
-    // Hide Next Collection card for residents
+    // Show Next Collection card only for drivers
     final currentUser = FirebaseAuthService.currentUser;
-    if (currentUser?.role == UserRole.resident) {
+    if (currentUser?.role != UserRole.driver) {
       return const SizedBox.shrink();
     }
 
