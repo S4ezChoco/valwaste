@@ -48,10 +48,50 @@ async function loadFirebaseSDK() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     updateCategoryOptions();
+    showInitialLoadingState();
     loadCollectionApprovalReports();
     updateReportCounts();
-    displayReports();
 });
+
+// Show initial loading state
+function showInitialLoadingState() {
+    const tbody = document.getElementById('reports-tbody');
+    tbody.innerHTML = `
+        <tr class="loading">
+            <td colspan="7" style="text-align: center; padding: 40px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    <div class="loading-spinner"></div>
+                    <span>Loading reports...</span>
+                </div>
+            </td>
+        </tr>
+    `;
+    
+    // Add loading spinner styles if not already present
+    if (!document.getElementById('loading-spinner-styles')) {
+        const style = document.createElement('style');
+        style.id = 'loading-spinner-styles';
+        style.textContent = `
+            .loading-spinner {
+                width: 20px;
+                height: 20px;
+                border: 2px solid #f3f4f6;
+                border-top: 2px solid #3b82f6;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            .loading td {
+                color: #6b7280;
+                font-style: italic;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
 
 // Tab switching
 function switchTab(tab) {
@@ -414,10 +454,12 @@ async function loadCollectionApprovalReports() {
         
         console.log(`Loaded ${snapshot.size} collection requests from Firebase`);
         
+        // Always update counts and display, even if no data
+        updateReportCounts();
+        displayReports();
+        
         if (snapshot.size === 0) {
             console.log('No collection requests found in Firebase');
-            const tbody = document.getElementById('reports-tbody');
-            tbody.innerHTML = '<tr class="empty"><td colspan="7">No collection requests found. Create collection requests in the Flutter app to see them here.</td></tr>';
         }
         
         console.log('Final report data - Pending reports:', reportData.pending.length);
@@ -426,9 +468,6 @@ async function loadCollectionApprovalReports() {
         console.log('Collection request reports:', reportData.pending.filter(r => r.category === 'Collection Request').length + 
                    reportData.resolved.filter(r => r.category === 'Collection Request').length + 
                    reportData.unresolved.filter(r => r.category === 'Collection Request').length);
-        
-        updateReportCounts();
-        displayReports();
         
     } catch (error) {
         console.error('Error loading collection approval reports:', error);
@@ -508,7 +547,23 @@ async function getAddressFromCoordinates(latitude, longitude) {
 // Refresh reports
 function refreshReports() {
     console.log('Refreshing reports...');
+    showRefreshLoadingState();
     loadCollectionApprovalReports();
+}
+
+// Show loading state for refresh
+function showRefreshLoadingState() {
+    const tbody = document.getElementById('reports-tbody');
+    tbody.innerHTML = `
+        <tr class="loading">
+            <td colspan="7" style="text-align: center; padding: 30px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    <div class="loading-spinner"></div>
+                    <span>Refreshing reports...</span>
+                </div>
+            </td>
+        </tr>
+    `;
 }
 
 // Test function to create a sample approved collection (for testing only)
@@ -552,11 +607,11 @@ async function createTestApprovedCollection() {
         
         await db.collection('collections').add(testCollection);
         console.log('Test approved collection created successfully!');
-        alert('Test approved collection created! Refresh the page to see it.');
+        window.notifications.success('Test approved collection created! Refresh the page to see it.');
         
     } catch (error) {
         console.error('Error creating test collection:', error);
-        alert('Error creating test collection: ' + error.message);
+        window.notifications.error('Error creating test collection: ' + error.message);
     }
 }
 
@@ -658,7 +713,7 @@ function viewReport(reportId) {
     const result = findReportById(reportId);
     if (!result) {
         console.error('❌ Report not found:', reportId);
-        alert('Report not found: ' + reportId);
+        window.notifications.error('Report not found: ' + reportId);
         return;
     }
     
@@ -916,7 +971,7 @@ async function scheduleCollection(collectionId) {
         
     } catch (error) {
         console.error('Error showing scheduling modal:', error);
-        alert('Error showing scheduling form. Please try again.');
+        window.notifications.error('Error showing scheduling form. Please try again.');
     }
 }
 
@@ -927,14 +982,14 @@ async function confirmScheduleCollection(collectionId) {
         const driverId = document.getElementById('driverId').value;
         
         if (!scheduledDate || !truckId || !driverId) {
-            alert('Please fill in all fields.');
+            window.notifications.warning('Please fill in all fields.');
             return;
         }
         
         // Validate date format
         const date = new Date(scheduledDate);
         if (isNaN(date.getTime())) {
-            alert('Invalid date format.');
+            window.notifications.error('Invalid date format.');
             return;
         }
         
@@ -1003,7 +1058,7 @@ async function confirmScheduleCollection(collectionId) {
             // Keep in pending tab until driver actually completes the collection
             // Don't move to resolved tab yet - driver needs to complete it first
             
-            alert('Collection scheduled successfully! Driver will complete the collection.');
+            window.notifications.success('Collection scheduled successfully! Driver will complete the collection.');
         }
         
         closeSchedulingModal();
@@ -1011,7 +1066,7 @@ async function confirmScheduleCollection(collectionId) {
         
     } catch (error) {
         console.error('Error scheduling collection:', error);
-        alert('Error scheduling collection. Please try again.');
+        window.notifications.error('Error scheduling collection. Please try again.');
     }
 }
 
@@ -1137,7 +1192,7 @@ async function handleCollectionSchedule(event) {
     try {
         const collectionId = window.currentSchedulingCollectionId;
         if (!collectionId) {
-            alert('No collection selected for scheduling.');
+            window.notifications.warning('No collection selected for scheduling.');
             return;
         }
         
@@ -1148,7 +1203,7 @@ async function handleCollectionSchedule(event) {
         const driverId = document.getElementById('driver-select').value;
         
         if (!truckId || !scheduledDate || !startTime || !endTime || !driverId) {
-            alert('Please fill in all required fields.');
+            window.notifications.warning('Please fill in all required fields.');
             return;
         }
         
@@ -1221,7 +1276,7 @@ async function handleCollectionSchedule(event) {
             // Move to resolved tab
             moveReport(`collection_${collectionId}`, 'resolved');
             
-            alert('Collection scheduled successfully!');
+            window.notifications.success('Collection scheduled successfully!');
         }
         
         // Close the modal
@@ -1235,7 +1290,7 @@ async function handleCollectionSchedule(event) {
         
     } catch (error) {
         console.error('Error scheduling collection:', error);
-        alert('Error scheduling collection. Please try again.');
+        window.notifications.error('Error scheduling collection. Please try again.');
     }
 }
 
@@ -1277,34 +1332,99 @@ function showSimpleSchedulingModal(collectionId) {
     document.getElementById('scheduledDate').min = today;
 }
 
-// Move report between tabs
-function moveReport(reportId, targetStatus) {
+// Update collection status in Firebase
+async function updateCollectionStatusInFirebase(collectionId, targetStatus) {
+    try {
+        if (typeof firebase === 'undefined') {
+            await loadFirebaseSDK();
+        }
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyAr5KSpYvShZrCEJLMGf7ckrbfedta3W_M",
+            authDomain: "valwaste-89930.firebaseapp.com",
+            projectId: "valwaste-89930",
+            storageBucket: "valwaste-89930.firebasestorage.app",
+            messagingSenderId: "301491189774",
+            appId: "1:301491189774:web:23f0fa68d2b264946b245f",
+            measurementId: "G-C70DHXP9FW"
+        };
+        
+        if (!firebase.apps || firebase.apps.length === 0) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        
+        const db = firebase.firestore();
+        
+        // Map target status to Firebase status
+        let firebaseStatus;
+        switch (targetStatus) {
+            case 'resolved':
+                firebaseStatus = 'completed';
+                break;
+            case 'unresolved':
+                firebaseStatus = 'cancelled';
+                break;
+            case 'pending':
+                firebaseStatus = 'pending';
+                break;
+            default:
+                firebaseStatus = targetStatus;
+        }
+        
+        // Update the collection document
+        await db.collection('collections').doc(collectionId).update({
+            status: firebaseStatus,
+            updated_at: new Date().toISOString(),
+            updated_by: 'admin'
+        });
+        
+        console.log(`✅ Collection ${collectionId} status updated to ${firebaseStatus} in Firebase`);
+        
+    } catch (error) {
+        console.error('Error updating collection status in Firebase:', error);
+        throw error;
+    }
+}
+
+// Move report between tabs with Firebase update
+async function moveReport(reportId, targetStatus) {
     console.log('🔄 moveReport called with ID:', reportId, 'targetStatus:', targetStatus);
     const result = findReportById(reportId);
     if (!result) {
         console.error('❌ Report not found:', reportId);
-        alert('Report not found: ' + reportId);
+        window.notifications.error('Report not found: ' + reportId);
         return;
     }
     
     const { report, currentTab } = result;
     console.log('✅ Found report in tab:', currentTab, 'moving to:', targetStatus);
     
-    // Remove from current tab
-    const currentIndex = reportData[currentTab].findIndex(r => r.id === reportId);
-    if (currentIndex > -1) {
-        reportData[currentTab].splice(currentIndex, 1);
+    try {
+        // Update Firebase if this is a collection request
+        if (report.category === 'Collection Request' && report.collectionId) {
+            await updateCollectionStatusInFirebase(report.collectionId, targetStatus);
+        }
+        
+        // Remove from current tab
+        const currentIndex = reportData[currentTab].findIndex(r => r.id === reportId);
+        if (currentIndex > -1) {
+            reportData[currentTab].splice(currentIndex, 1);
+        }
+        
+        // Update status and add to target tab
+        report.status = targetStatus.charAt(0).toUpperCase() + targetStatus.slice(1);
+        reportData[targetStatus].push(report);
+        
+        // Update UI
+        updateReportCounts();
+        displayReports();
+        
+        // Show success message
+        console.log(`✅ Report ${reportId} moved to ${targetStatus}`);
+        window.notifications.success(`Report moved to ${targetStatus} tab successfully!`);
+        
+    } catch (error) {
+        console.error('Error updating report status:', error);
+        window.notifications.error('Failed to update report status. Please try again.');
     }
-    
-    // Update status and add to target tab
-    report.status = targetStatus.charAt(0).toUpperCase() + targetStatus.slice(1);
-    reportData[targetStatus].push(report);
-    
-    // Update UI
-    updateReportCounts();
-    displayReports();
-    
-    // Show success message
-    console.log(`✅ Report ${reportId} moved to ${targetStatus}`);
-    alert(`Report moved to ${targetStatus} tab successfully!`);
 }

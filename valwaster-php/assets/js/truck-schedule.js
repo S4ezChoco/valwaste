@@ -213,45 +213,45 @@ function renderDrivers() {
     });
 }
 
-// Load waste collectors from Firebase
+// Load waste collectors - Static Filipino names (no database connection)
 function loadWasteCollectors() {
-    db.collection('users').where('role', 'in', ['Driver', 'Waste Collector']).onSnapshot((snapshot) => {
-        allCollectors = [];
-        snapshot.forEach((doc) => {
-            const userData = doc.data();
-            allCollectors.push({
-                id: doc.id,
-                ...userData,
-                displayName: `${userData.firstName} ${userData.lastName}`
-            });
-        });
-        
-        // Initial render shows all collectors
-        renderCollectors();
-    });
+    // Static array of 40 Filipino male names for waste collectors
+    const filipinoCollectors = [
+        'Juan Santos', 'Marco Garcia', 'Jose Reyes', 'Angelo Cruz', 'Pedro Gonzales',
+        'Carlos Rivera', 'Antonio Lopez', 'Roberto Martinez', 'Miguel Torres', 'Luis Fernandez',
+        'Carlos Morales', 'Emilio Castillo', 'Ramon Dela Cruz', 'Joseph Ramos', 'Eduardo Villanueva',
+        'Rodrigo Aquino', 'Francisco Mendoza', 'Emmanuel Bautista', 'Ricardo Hernandez', 'Paolo Santos',
+        'Alfredo Pascual', 'Gabriel Aguilar', 'Renato Silva', 'Cesar Valdez', 'Armando Jimenez',
+        'Teodoro Flores', 'Danilo Castro', 'Nestor Perez', 'Roberto Padilla', 'Alberto Cruz',
+        'Ernesto Lim', 'Nelson Tan', 'Leopoldo Mercado', 'Marcelino Santiago', 'Gerardo Navarro',
+        'Domingo Ochoa', 'Florencio Diaz', 'Patricio Velasco', 'Rogelio Estrada', 'Christian Gutierrez'
+    ];
+    
+    // Convert to collector objects
+    allCollectors = filipinoCollectors.map((name, index) => ({
+        id: `collector_${index + 1}`,
+        displayName: name,
+        role: 'Waste Collector'
+    }));
+    
+    // Initial render shows all collectors
+    renderCollectors();
 }
 
-// Render collectors based on current filter
+// Render collectors - Static list without barangay filtering
 function renderCollectors() {
     const collectorsMenu = document.getElementById('collectors-dropdown-menu');
     collectorsMenu.innerHTML = '';
     
-    // Filter collectors based on current barangay filter
-    let collectorsToShow = allCollectors;
-    if (currentBarangayFilter) {
-        collectorsToShow = allCollectors.filter(collector => 
-            collector.barangay === currentBarangayFilter
-        );
-    }
+    // Show all static collectors (no filtering by barangay)
+    const collectorsToShow = allCollectors;
     
     if (collectorsToShow.length === 0) {
         const emptyItem = document.createElement('div');
         emptyItem.className = 'dropdown-item';
         emptyItem.style.color = '#6b7280';
         emptyItem.style.fontStyle = 'italic';
-        emptyItem.innerHTML = currentBarangayFilter ? 
-            `No paleros in ${currentBarangayFilter}` : 
-            'No paleros available';
+        emptyItem.innerHTML = 'No paleros available';
         collectorsMenu.appendChild(emptyItem);
         return;
     }
@@ -274,7 +274,7 @@ function renderCollectors() {
         });
         
         const span = document.createElement('span');
-        span.textContent = `${collector.displayName} (${collector.role === 'Waste Collector' ? 'Palero' : 'Driver'})${collector.barangay ? ` - ${collector.barangay}` : ''}`;
+        span.textContent = collector.displayName;
         span.style.marginLeft = '8px';
         span.style.cursor = 'pointer';
         

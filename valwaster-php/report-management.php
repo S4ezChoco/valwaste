@@ -295,6 +295,7 @@
     </div>
 
     <script type="module" src="assets/js/auth.js"></script>
+    <script src="assets/js/notifications.js"></script>
     <script src="assets/js/report-management.js"></script>
 </body>
 </html>
