@@ -194,8 +194,6 @@ class FirebaseAuthService {
     required String lastName,
     required String email,
     required String password,
-    required String phone,
-    required String address,
     String? barangay = 'Valenzuela City',
     UserRole role = UserRole.resident, // Default to resident
   }) async {
@@ -205,58 +203,123 @@ class FirebaseAuthService {
       // Set registration flag to prevent auth state listener interference
       _isRegistering = true;
 
-      // Skip existing user check to avoid PigeonUserDetails error
-      // Create user with Firebase Auth directly
-      final UserCredential userCredential = await _auth
-          .createUserWithEmailAndPassword(email: email, password: password);
+      // Check if user already exists in Firebase Auth first
+      try {
+        await _auth.fetchSignInMethodsForEmail(email);
+        // If we get here without exception, check the sign-in methods
+        final methods = await _auth.fetchSignInMethodsForEmail(email);
+        if (methods.isNotEmpty) {
+          return {
+            'success': false, 
+            'message': 'An account already exists for that email. Please login instead.'
+          };
+        }
+      } catch (e) {
+        // If fetchSignInMethodsForEmail fails, we can proceed with registration
+        print('Email check completed, proceeding with registration');
+      }
 
-      final User? firebaseUser = userCredential.user;
+      // Create user with Firebase Auth - with PigeonUserDetails error handling
+      User? firebaseUser;
+      try {
+        final UserCredential userCredential = await _auth
+            .createUserWithEmailAndPassword(email: email, password: password);
+        firebaseUser = userCredential.user;
+      } catch (authError) {
+        print('Auth creation error: $authError');
+        
+        // Handle PigeonUserDetails error specifically
+        if (authError.toString().contains('PigeonUserDetails') || 
+            authError.toString().contains('pigeonUser') ||
+            authError.toString().contains('List<Object?>') ||
+            authError.toString().contains('PigeonUserInfo')) {
+          print('PigeonUserDetails/Info error during auth creation - checking if user was created...');
+          
+          // Wait a moment for auth state to settle
+          await Future.delayed(const Duration(milliseconds: 1500));
+          
+          // Check if user was actually created despite the error - avoid reload()
+          firebaseUser = _auth.currentUser;
+          
+          if (firebaseUser != null && firebaseUser.email != null) {
+            print('User was created successfully despite PigeonUserDetails error: ${firebaseUser.uid}');
+            print('User email: ${firebaseUser.email}');
+          } else {
+            print('User was not created or no current user found');
+            return {
+              'success': false,
+              'message': 'Account creation failed due to a technical issue. Please restart the app and try again.'
+            };
+          }
+        } else {
+          // Re-throw non-PigeonUserDetails auth errors
+          rethrow;
+        }
+      }
+      
       if (firebaseUser == null) {
         return {'success': false, 'message': 'Failed to create user account.'};
       }
 
       print('Firebase Auth user created with UID: ${firebaseUser.uid}');
 
-      // Create user data for Firestore - matching PHP admin structure
-      final userData = {
-        'firstName': firstName,
-        'lastName': lastName,
-        'email': email,
-        'phone': phone,
-        'address': address,
-        'barangay': barangay ?? 'Valenzuela City',
-        'role': role == UserRole.resident ? 'Resident' : role.name,
-        'createdAt': Timestamp.fromDate(DateTime.now()),
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      // Create user data for Firestore - matching admin panel structure
+      final now = DateTime.now().toUtc().toIso8601String();
+      final Map<String, dynamic> userData = {
+        'authUserId': firebaseUser.uid, // Link to Firebase Auth UID
+        'firstName': firstName.trim(),
+        'lastName': lastName.trim(),
+        'email': email.trim().toLowerCase(),
+        'barangay': (barangay ?? 'Valenzuela City').trim(),
+        'role': 'Resident', // Always set as Resident for mobile registration
         'isActive': true,
+        'createdAt': now,
+        'updatedAt': now,
       };
 
       print('User data prepared for Firestore: $userData');
 
-      // Save to Firestore
-      try {
-        await _firestore
-            .collection('users')
-            .doc(firebaseUser.uid)
-            .set(userData);
-
-        print('User data saved to Firestore successfully');
-        
-        // Small delay to ensure Firestore write is committed
-        await Future.delayed(const Duration(milliseconds: 500));
-      } catch (firestoreError) {
-        print('Error saving to Firestore: $firestoreError');
-        // If Firestore save fails, delete the Firebase Auth user
+      // Save to Firestore with retry logic
+      bool firestoreSaved = false;
+      int retryCount = 0;
+      const maxRetries = 3;
+      
+      while (!firestoreSaved && retryCount < maxRetries) {
         try {
-          await firebaseUser.delete();
-          print('Firebase Auth user deleted due to Firestore save failure');
-        } catch (deleteError) {
-          print('Error deleting Firebase Auth user: $deleteError');
+          retryCount++;
+          print('Attempting Firestore save (attempt $retryCount/$maxRetries)');
+          
+          await _firestore
+              .collection('users')
+              .doc(firebaseUser.uid)
+              .set(userData, SetOptions(merge: false));
+
+          print('User data saved to Firestore successfully');
+          firestoreSaved = true;
+          
+          // Small delay to ensure Firestore write is committed
+          await Future.delayed(const Duration(milliseconds: 300));
+          
+        } catch (firestoreError) {
+          print('Firestore save attempt $retryCount failed: $firestoreError');
+          
+          if (retryCount >= maxRetries) {
+            // If all retries failed, delete the Firebase Auth user
+            try {
+              await firebaseUser.delete();
+              print('Firebase Auth user deleted due to Firestore save failure');
+            } catch (deleteError) {
+              print('Error deleting Firebase Auth user: $deleteError');
+            }
+            return {
+              'success': false,
+              'message': 'Failed to save user data after $maxRetries attempts. Please try again.',
+            };
+          } else {
+            // Wait before retry
+            await Future.delayed(Duration(milliseconds: 500 * retryCount));
+          }
         }
-        return {
-          'success': false,
-          'message': 'Failed to save user data. Please try again.',
-        };
       }
 
       // Create user model for current user
@@ -264,20 +327,20 @@ class FirebaseAuthService {
       final userModel = UserModel(
         id: firebaseUser.uid,
         name: fullName,
-        firstName: firstName,
-        lastName: lastName,
-        email: email,
-        phone: phone,
-        address: address,
-        barangay: barangay ?? 'Valenzuela City',
-        role: role,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim().toLowerCase(),
+        phone: '', // Empty for residents
+        address: '', // Empty for residents
+        barangay: (barangay ?? 'Valenzuela City').trim(),
+        role: UserRole.resident, // Always resident for mobile registration
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
 
       // Set current user directly - avoid any Firestore queries during registration
       _currentUser = userModel;
-      print('Registration completed with local user model');
+      print('Registration completed successfully for: ${userModel.name}');
 
       return {
         'success': true,
@@ -299,14 +362,35 @@ class FirebaseAuthService {
         case 'invalid-email':
           message = 'Please provide a valid email address.';
           break;
+        case 'operation-not-allowed':
+          message = 'Email/password accounts are not enabled.';
+          break;
+        case 'network-request-failed':
+          message = 'Network error. Please check your internet connection.';
+          break;
         default:
-          message = 'An error occurred during registration: ${e.message}';
+          message = 'Registration failed: ${e.message}';
       }
       return {'success': false, 'message': message};
     } catch (e) {
       print('Unexpected error during registration: $e');
       print('Error type: ${e.runtimeType}');
-      return {'success': false, 'message': 'An unexpected error occurred: $e'};
+      
+      // Handle specific PigeonUserDetails errors
+      if (e.toString().contains('PigeonUserDetails') || 
+          e.toString().contains('pigeonUser') ||
+          e.toString().contains('List<Object?>')) {
+        print('Detected PigeonUserDetails error - this is a known Flutter Firebase issue');
+        return {
+          'success': false, 
+          'message': 'Registration failed due to a technical issue. Please restart the app and try again.'
+        };
+      }
+      
+      return {
+        'success': false, 
+        'message': 'An unexpected error occurred. Please try again.'
+      };
     } finally {
       // Always reset the registration flag
       _isRegistering = false;
