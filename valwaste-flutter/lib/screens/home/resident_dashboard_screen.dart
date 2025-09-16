@@ -6,7 +6,6 @@ import '../../widgets/announcement_card.dart';
 import '../collection/collection_request_screen.dart';
 import '../guide/recycling_guide_screen.dart';
 import '../history/history_screen.dart';
-import '../notifications/notifications_screen.dart';
 import '../map/map_screen.dart';
 import '../schedule/schedule_screen.dart';
 
@@ -76,8 +75,8 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
           .map(
             (collection) => {
               'id': collection.id,
-              'wasteType': collection.wasteType,
-              'status': collection.status,
+              'wasteType': collection.wasteType.toString().split('.').last,
+              'status': collection.status.toString().split('.').last,
               'scheduledDate': collection.scheduledDate,
               'createdAt': collection.createdAt,
             },
@@ -258,38 +257,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const Spacer(),
-                    if (_lastUpdated != null) ...[
-                      Text(
-                        'Updated: ${_lastUpdated!.hour}:${_lastUpdated!.minute.toString().padLeft(2, '0')}',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: AppSizes.paddingSmall),
-                    ],
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: IconButton(
-                        onPressed: _isLoading ? null : _loadDashboardData,
-                        icon: _isLoading
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
-                                ),
-                              )
-                            : const Icon(Icons.refresh, color: Colors.white),
-                        tooltip: 'Refresh Data',
-                      ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: AppSizes.paddingMedium),
@@ -365,19 +332,6 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (context) => const HistoryScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    _ActionCard(
-                      icon: Icons.notifications_outlined,
-                      title: 'Notifications',
-                      subtitle: 'Stay updated',
-                      color: Colors.red,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const NotificationsScreen(),
                           ),
                         );
                       },

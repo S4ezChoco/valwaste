@@ -1410,7 +1410,7 @@ class _MapScreenState extends State<MapScreen>
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'No driver assigned yet. Check console for debug info.',
+                  'No driver assigned yet.',
                   style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
                 ),
               ),

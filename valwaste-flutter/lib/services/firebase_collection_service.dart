@@ -104,6 +104,8 @@ class FirebaseCollectionService {
       print('🔍 Fetching collections for user: $userId');
       print('🔍 User ID type: ${userId.runtimeType}');
       print('🔍 User ID length: ${userId.length}');
+      print('🔍 User role: ${userRole.toString()}');
+      print('🔍 User barangay: $userBarangay');
 
       // First, let's check all collections to see what's in the database
       final allCollectionsSnapshot = await _firestore
@@ -113,28 +115,68 @@ class FirebaseCollectionService {
       print(
         '📄 Total collections in database: ${allCollectionsSnapshot.docs.length}',
       );
+      
+      // Debug: Print all collection user_ids to see if there's a mismatch
+      if (allCollectionsSnapshot.docs.isNotEmpty) {
+        print('📝 Sample collections in database:');
+        for (var i = 0; i < allCollectionsSnapshot.docs.length && i < 3; i++) {
+          final doc = allCollectionsSnapshot.docs[i];
+          final data = doc.data();
+          print('  - Collection ${doc.id}: user_id=${data['user_id']}, status=${data['status']}');
+        }
+      }
 
       // Determine query based on user role
       Query<Map<String, dynamic>> query;
       
       if (userRole == UserRole.resident) {
         // Residents see only their own requests
+        print('🔍 Querying with user_id filter: $userId');
         query = _firestore
             .collection('collections')
             .where('user_id', isEqualTo: userId);
       } else if (userRole == UserRole.barangayOfficial) {
         // Barangay officials see only requests from their barangay
+        print('🔍 Querying with barangay filter: $userBarangay');
         query = _firestore
             .collection('collections')
             .where('barangay', isEqualTo: userBarangay);
       } else {
         // Drivers and administrators see all requests
+        print('🔍 Querying all collections (no filter)');
         query = _firestore.collection('collections');
       }
 
-      final querySnapshot = await query
-          .orderBy('created_at', descending: true)
-          .get();
+      // Try query without orderBy first to check if it's an index issue
+      QuerySnapshot<Map<String, dynamic>> querySnapshot;
+      try {
+        querySnapshot = await query
+            .orderBy('created_at', descending: true)
+            .get();
+      } catch (indexError) {
+        print('⚠️ Index error, trying without orderBy: $indexError');
+        // If there's an index error, try without orderBy
+        try {
+          if (userRole == UserRole.resident) {
+            querySnapshot = await _firestore
+                .collection('collections')
+                .where('user_id', isEqualTo: userId)
+                .get();
+          } else if (userRole == UserRole.barangayOfficial) {
+            querySnapshot = await _firestore
+                .collection('collections')
+                .where('barangay', isEqualTo: userBarangay)
+                .get();
+          } else {
+            querySnapshot = await _firestore
+                .collection('collections')
+                .get();
+          }
+        } catch (fallbackError) {
+          print('❌ Fallback query also failed: $fallbackError');
+          return [];
+        }
+      }
 
       print(
         '📄 Found ${querySnapshot.docs.length} collection documents for this user',
@@ -149,6 +191,7 @@ class FirebaseCollectionService {
       return collections;
     } catch (e) {
       print('❌ Error fetching user collections: $e');
+      print('❌ Error details: ${e.toString()}');
       return [];
     }
   }
@@ -305,7 +348,6 @@ class FirebaseCollectionService {
           )
           .length;
       double totalWeight = collections
-          .where((c) => c.status == CollectionStatus.completed)
           .fold(0.0, (sum, c) => sum + c.quantity);
 
       final stats = {

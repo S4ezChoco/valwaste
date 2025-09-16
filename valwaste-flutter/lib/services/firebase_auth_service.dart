@@ -198,7 +198,7 @@ class FirebaseAuthService {
     UserRole role = UserRole.resident, // Default to resident
   }) async {
     try {
-      print('Starting registration for: $email with role: ${role.name}');
+      print('Starting registration for: $email with role: ${role.toString().split('.').last}');
       
       // Set registration flag to prevent auth state listener interference
       _isRegistering = true;
@@ -986,7 +986,7 @@ class FirebaseAuthService {
         'phone': phone,
         'address': address,
         'barangay': barangay ?? 'Valenzuela City',
-        'role': role == UserRole.resident ? 'Resident' : role.name,
+        'role': role == UserRole.resident ? 'Resident' : role.toString().split('.').last,
         'createdAt': Timestamp.fromDate(DateTime.now()),
         'updatedAt': Timestamp.fromDate(DateTime.now()),
         'isActive': true,

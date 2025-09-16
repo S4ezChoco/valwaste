@@ -59,15 +59,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
 
     try {
-      // Convert collections to report items
+      // Calculate waste type breakdown
+      final Map<String, int> wasteTypeBreakdown = {};
+      for (var collection in _collections) {
+        final wasteType = collection.wasteTypeText;
+        wasteTypeBreakdown[wasteType] = (wasteTypeBreakdown[wasteType] ?? 0) + 1;
+      }
+
+      // Convert collections to report items (include all collections, not just completed)
       final recentReports = _collections
-          .where((c) => c.status == CollectionStatus.completed)
-          .take(10)
+          .take(15) // Include more items in the report
           .map(
             (collection) => WasteReportItem(
               type: collection.wasteTypeText,
-              date:
-                  '${collection.completedAt?.day}/${collection.completedAt?.month}/${collection.completedAt?.year}',
+              date: collection.completedAt != null
+                  ? '${collection.completedAt?.day}/${collection.completedAt?.month}/${collection.completedAt?.year}'
+                  : '${collection.scheduledDate.day}/${collection.scheduledDate.month}/${collection.scheduledDate.year}',
               status: collection.statusText,
               quantity: '${collection.quantity} ${collection.unit}',
             ),
@@ -77,8 +84,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
       await PdfService.generateWasteReport(
         userName: FirebaseAuthService.currentUser?.name ?? 'User',
         totalCollections: _stats['totalCollections'] ?? 0,
-        recycledItems: _stats['completedCollections'] ?? 0,
+        completedCollections: _stats['completedCollections'] ?? 0,
+        pendingCollections: _stats['pendingCollections'] ?? 0,
+        totalWeight: (_stats['totalWeight'] ?? 0.0).toDouble(),
         recentReports: recentReports,
+        wasteTypeBreakdown: wasteTypeBreakdown,
       );
 
       if (mounted) {
@@ -121,6 +131,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
               decoration: const BoxDecoration(color: AppColors.surface),
               child: Row(
                 children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'Back to Home',
+                  ),
                   Expanded(
                     child: Text(
                       'Report',
@@ -148,7 +163,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : Container(
+                  : SingleChildScrollView(
                       padding: const EdgeInsets.all(AppSizes.paddingMedium),
                       child: Column(
                         children: [

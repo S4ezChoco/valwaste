@@ -561,7 +561,7 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
                   ),
                   child: Column(
                     children: WasteType.values.map((wasteType) {
-                      final wasteTypeString = wasteType.name;
+                      final wasteTypeString = wasteType.toString().split('.').last;
                       final wasteName =
                           WasteTypeData.wasteTypes[wasteTypeString]!;
                       final wasteColor =

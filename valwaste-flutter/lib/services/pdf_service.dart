@@ -9,8 +9,11 @@ class PdfService {
   static Future<void> generateWasteReport({
     required String userName,
     required int totalCollections,
-    required int recycledItems,
+    required int completedCollections,
+    required int pendingCollections,
+    required double totalWeight,
     required List<WasteReportItem> recentReports,
+    Map<String, int>? wasteTypeBreakdown,
     String? barangay = 'Valenzuela City',
   }) async {
     final pdf = pw.Document();
@@ -21,7 +24,14 @@ class PdfService {
         pageFormat: PdfPageFormat.a4,
         build: (context) => [
           _buildHeader(userName),
-          _buildStatistics(totalCollections, recycledItems),
+          _buildStatistics(
+            totalCollections, 
+            completedCollections, 
+            pendingCollections, 
+            totalWeight
+          ),
+          if (wasteTypeBreakdown != null && wasteTypeBreakdown.isNotEmpty)
+            _buildWasteTypeBreakdown(wasteTypeBreakdown),
           _buildRecentReports(recentReports),
           _buildFooter(),
         ],
@@ -82,62 +92,207 @@ class PdfService {
     );
   }
 
-  static pw.Widget _buildStatistics(int totalCollections, int recycledItems) {
+  static pw.Widget _buildStatistics(
+    int totalCollections, 
+    int completedCollections,
+    int pendingCollections,
+    double totalWeight,
+  ) {
     return pw.Container(
       margin: const pw.EdgeInsets.symmetric(vertical: 20),
-      child: pw.Row(
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Expanded(
-            child: pw.Container(
-              padding: const pw.EdgeInsets.all(20),
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.green),
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
-              ),
-              child: pw.Column(
-                children: [
-                  pw.Text(
-                    totalCollections.toString(),
-                    style: pw.TextStyle(
-                      fontSize: 32,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.green,
-                    ),
-                  ),
-                  pw.SizedBox(height: 10),
-                  pw.Text(
-                    'Total Collections',
-                    style: pw.TextStyle(fontSize: 14, color: PdfColors.grey),
-                  ),
-                ],
-              ),
+          pw.Text(
+            'Collection Statistics',
+            style: pw.TextStyle(
+              fontSize: 18,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.black,
             ),
           ),
-          pw.SizedBox(width: 20),
-          pw.Expanded(
-            child: pw.Container(
-              padding: const pw.EdgeInsets.all(20),
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.orange),
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
-              ),
-              child: pw.Column(
-                children: [
-                  pw.Text(
-                    recycledItems.toString(),
-                    style: pw.TextStyle(
-                      fontSize: 32,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.orange,
-                    ),
+          pw.SizedBox(height: 15),
+          // First row of statistics
+          pw.Row(
+            children: [
+              pw.Expanded(
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(20),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.blue),
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
                   ),
-                  pw.SizedBox(height: 10),
-                  pw.Text(
-                    'Recycled Items',
-                    style: pw.TextStyle(fontSize: 14, color: PdfColors.grey),
+                  child: pw.Column(
+                    children: [
+                      pw.Text(
+                        totalCollections.toString(),
+                        style: pw.TextStyle(
+                          fontSize: 32,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.blue,
+                        ),
+                      ),
+                      pw.SizedBox(height: 10),
+                      pw.Text(
+                        'Total Collections',
+                        style: pw.TextStyle(fontSize: 14, color: PdfColors.grey),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
+              pw.SizedBox(width: 20),
+              pw.Expanded(
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(20),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.green),
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
+                  ),
+                  child: pw.Column(
+                    children: [
+                      pw.Text(
+                        completedCollections.toString(),
+                        style: pw.TextStyle(
+                          fontSize: 32,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.green,
+                        ),
+                      ),
+                      pw.SizedBox(height: 10),
+                      pw.Text(
+                        'Completed',
+                        style: pw.TextStyle(fontSize: 14, color: PdfColors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 20),
+          // Second row of statistics
+          pw.Row(
+            children: [
+              pw.Expanded(
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(20),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.orange),
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
+                  ),
+                  child: pw.Column(
+                    children: [
+                      pw.Text(
+                        pendingCollections.toString(),
+                        style: pw.TextStyle(
+                          fontSize: 32,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.orange,
+                        ),
+                      ),
+                      pw.SizedBox(height: 10),
+                      pw.Text(
+                        'Pending',
+                        style: pw.TextStyle(fontSize: 14, color: PdfColors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              pw.SizedBox(width: 20),
+              pw.Expanded(
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(20),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.purple),
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
+                  ),
+                  child: pw.Column(
+                    children: [
+                      pw.Text(
+                        '${totalWeight.toStringAsFixed(1)} kg',
+                        style: pw.TextStyle(
+                          fontSize: 24,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.purple,
+                        ),
+                      ),
+                      pw.SizedBox(height: 10),
+                      pw.Text(
+                        'Total Weight',
+                        style: pw.TextStyle(fontSize: 14, color: PdfColors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _buildWasteTypeBreakdown(Map<String, int> breakdown) {
+    return pw.Container(
+      margin: const pw.EdgeInsets.symmetric(vertical: 20),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'Waste Type Breakdown',
+            style: pw.TextStyle(
+              fontSize: 18,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.black,
+            ),
+          ),
+          pw.SizedBox(height: 15),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(15),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.grey300),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
+            ),
+            child: pw.Column(
+              children: breakdown.entries.map((entry) {
+                return pw.Container(
+                  margin: const pw.EdgeInsets.only(bottom: 10),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(
+                        entry.key,
+                        style: pw.TextStyle(
+                          fontSize: 14,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColors.blue50,
+                          borderRadius: const pw.BorderRadius.all(
+                            pw.Radius.circular(12),
+                          ),
+                        ),
+                        child: pw.Text(
+                          '${entry.value} collections',
+                          style: pw.TextStyle(
+                            fontSize: 12,
+                            color: PdfColors.blue,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
             ),
           ),
         ],

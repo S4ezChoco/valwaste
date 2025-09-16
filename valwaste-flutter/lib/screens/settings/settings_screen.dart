@@ -475,7 +475,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _buildInfoRow(
                           icon: Icons.calendar_today,
                           title: 'Last Updated',
-                          value: 'September 6 2025',
+                          value: 'September 17 2025',
                         ),
                       ],
                     ),
