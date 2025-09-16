@@ -212,7 +212,7 @@
                     <div class="card stats-card">
                         <div class="stats-meta">
                             <p class="stats-label">Total Trucks</p>
-                            <h3 class="stats-value" id="totalTrucks">3</h3>
+                            <h3 class="stats-value" id="totalTrucks">0</h3>
                             <p class="stats-sub">Available on the map</p>
                         </div>
                         <div class="stats-icon">
@@ -846,8 +846,30 @@
                 }
             });
             
-            // Update truck count
-            document.getElementById('totalTrucks').textContent = todaySchedules.length;
+            // Update total truck count (count all unique trucks in the system)
+            updateTotalTrucksCount();
+        }
+        
+        // Function to count total unique trucks in the system
+        function updateTotalTrucksCount() {
+            if (scheduleData.length === 0) {
+                // If no schedule data loaded yet, show default count
+                document.getElementById('totalTrucks').textContent = '5'; // Default fleet size
+                return;
+            }
+            
+            // Get unique truck names from all schedules
+            const uniqueTrucks = new Set();
+            scheduleData.forEach(schedule => {
+                if (schedule.truck) {
+                    uniqueTrucks.add(schedule.truck);
+                }
+            });
+            
+            // If we have schedule data but no trucks, it means no trucks are configured
+            const totalTrucks = uniqueTrucks.size || 5; // Default to 5 if no data
+            document.getElementById('totalTrucks').textContent = totalTrucks;
+            console.log('Total trucks updated:', totalTrucks, 'Unique trucks:', Array.from(uniqueTrucks));
         }
 
         function setupBuildingsLayer() {
@@ -1590,7 +1612,7 @@
             );
         }
 
-        // Load recent reports function
+        // Load recent reports function - Updated to match report-management.js logic
         async function loadRecentReports() {
             console.log('Loading recent reports from Firebase...');
             const recentReportsList = document.getElementById('recentReportsList');
@@ -1604,10 +1626,10 @@
             `;
             
             try {
-                // Fetch collection requests with pending status
+                // Use the same approach as report-management.js - fetch ALL collections and filter by status
                 const snapshot = await db.collection('collections')
-                    .where('status', '==', 'pending')
-                    .limit(4)
+                    .orderBy('created_at', 'desc')
+                    .limit(20) // Get more to ensure we have enough after filtering
                     .get();
                 
                 console.log('Recent reports snapshot received, size:', snapshot.size);
@@ -1622,23 +1644,43 @@
                                 <line x1="16" y1="17" x2="8" y2="17"></line>
                                 <polyline points="10,9 9,9 8,9"></polyline>
                             </svg>
-                            <div style="font-weight: 500; margin-bottom: 4px;">No Pending Reports</div>
-                            <div style="font-size: 14px;">Pending reports will appear here when submitted by users</div>
+                            <div style="font-weight: 500; margin-bottom: 4px;">No Reports Found</div>
+                            <div style="font-size: 14px;">Reports will appear here when submitted by users</div>
                         </div>
                     `;
                     
                     // Update total reports count
-                    document.getElementById('totalReports').textContent = '0';
+                    updateTotalReportsCount();
                     return;
                 }
                 
                 let html = '';
-                let totalCount = 0;
+                let displayedCount = 0;
+                const maxDisplay = 3; // Show only 3 most recent
                 
-                // Process each report with proper user lookup
-                for (const doc of snapshot.docs) {
+                // Filter and process reports - show pending and approved status
+                const recentReports = [];
+                
+                snapshot.docs.forEach(doc => {
                     const report = doc.data();
-                    totalCount++;
+                    // Include pending and approved status reports (both need attention)
+                    if (report.status === 'pending' || report.status === 'approved' || !report.status) {
+                        recentReports.push({id: doc.id, data: report});
+                    }
+                });
+                
+                // Sort by created_at descending and take only the first 3
+                recentReports.sort((a, b) => {
+                    const dateA = a.data.created_at ? (a.data.created_at.toDate ? a.data.created_at.toDate() : new Date(a.data.created_at)) : new Date(0);
+                    const dateB = b.data.created_at ? (b.data.created_at.toDate ? b.data.created_at.toDate() : new Date(b.data.created_at)) : new Date(0);
+                    return dateB - dateA;
+                });
+                
+                // Process only the first 3 most recent reports
+                for (const reportDoc of recentReports.slice(0, maxDisplay)) {
+                    const report = reportDoc.data;
+                    const docId = reportDoc.id;
+                    displayedCount++;
                     
                     // Get proper date
                     const createdDate = report.created_at ? 
@@ -1652,28 +1694,22 @@
                     let userName = 'Unknown User';
                     try {
                         if (report.user_id) {
-                            console.log('Fetching user data for user_id:', report.user_id);
-                            
                             // Try to get user by document ID first
                             const userDoc = await db.collection('users').doc(report.user_id).get();
                             if (userDoc.exists) {
                                 const userData = userDoc.data();
-                                console.log('User data found:', userData);
                                 userName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.email || userData.name || 'Unknown User';
                             } else {
                                 // If not found by document ID, try by field
                                 const userQuery = await db.collection('users').where('id', '==', report.user_id).get();
                                 if (!userQuery.empty) {
                                     const userData = userQuery.docs[0].data();
-                                    console.log('User data found by field:', userData);
                                     userName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.email || userData.name || 'Unknown User';
                                 }
                             }
-                            console.log('Final user name:', userName);
                         }
                     } catch (userError) {
                         console.log('Could not fetch user data:', userError);
-                        // Fallback to showing user ID if we can't get the name
                         if (report.user_id) {
                             userName = `User ${report.user_id.substring(0, 8)}`;
                         }
@@ -1711,18 +1747,24 @@
                     
                     const wasteType = report.waste_type || report.wasteType || 'General Waste';
                     
-                    // Status badge styling
-                    const statusClass = 'pending';
-                    const statusColor = '#f59e0b'; // Orange for pending
+                    // Status badge styling based on actual status
+                    let statusText, statusColor;
+                    if (report.status === 'approved') {
+                        statusText = 'Approved';
+                        statusColor = '#10b981'; // Green for approved
+                    } else {
+                        statusText = 'Pending';
+                        statusColor = '#f59e0b'; // Orange for pending
+                    }
                     
                     html += `
-                        <div class="recent-item" style="padding: 12px 0; border-bottom: 1px solid #f3f4f6; cursor: pointer;" onclick="viewReportDetails('${doc.id}')">
+                        <div class="recent-item" style="padding: 12px 0; border-bottom: 1px solid #f3f4f6; cursor: pointer;" onclick="viewReportDetails('${docId}')">
                             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
                                 <div style="font-weight: 500; color: #111827; font-size: 14px; flex: 1; margin-right: 8px;">
                                     Collection Request - ${wasteType}
                                 </div>
                                 <div style="display: inline-block; background: ${statusColor}; color: white; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 10px; text-transform: uppercase;">
-                                    Pending
+                                    ${statusText}
                                 </div>
                             </div>
                             <div style="color: #6b7280; font-size: 12px; line-height: 1.4;">
@@ -1734,18 +1776,29 @@
                     `;
                 }
                 
-                // Get total count of all pending reports for the stats
-                try {
-                    const countSnapshot = await db.collection('collections')
-                        .where('status', '==', 'pending')
-                        .get();
-                    document.getElementById('totalReports').textContent = countSnapshot.size;
-                } catch (error) {
-                    console.error('Error counting total reports:', error);
+                // Display the reports or empty state
+                if (displayedCount === 0) {
+                    recentReportsList.innerHTML = `
+                        <div class="empty-state" style="padding: 40px 20px; text-align: center; color: #6b7280;">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 16px; opacity: 0.5;">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14,2 14,8 20,8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10,9 9,9 8,9"></polyline>
+                            </svg>
+                            <div style="font-weight: 500; margin-bottom: 4px;">No Recent Reports</div>
+                            <div style="font-size: 14px;">Reports will appear here when submitted by users</div>
+                        </div>
+                    `;
+                } else {
+                    recentReportsList.innerHTML = html;
                 }
                 
-                recentReportsList.innerHTML = html;
-                console.log('Recent reports loaded successfully with', totalCount, 'reports');
+                // Update total reports count
+                updateTotalReportsCount();
+                
+                console.log('Recent reports loaded successfully with', displayedCount, 'reports displayed');
                 
             } catch (error) {
                 console.error('Error loading recent reports:', error);
@@ -1780,6 +1833,28 @@
             }
         }
         
+        // Function to update total reports count
+        async function updateTotalReportsCount() {
+            try {
+                const allCollectionsSnapshot = await db.collection('collections').get();
+                let totalReports = 0;
+                
+                allCollectionsSnapshot.forEach(doc => {
+                    const report = doc.data();
+                    // Count all reports that need attention (pending, approved, etc.)
+                    if (report.status) {
+                        totalReports++;
+                    }
+                });
+                
+                document.getElementById('totalReports').textContent = totalReports;
+                console.log('Total reports count updated:', totalReports);
+            } catch (error) {
+                console.error('Error counting total reports:', error);
+                document.getElementById('totalReports').textContent = '0';
+            }
+        }
+        
         // Function to view report details (redirect to report management)
         function viewReportDetails(reportId) {
             window.location.href = `report-management.php?reportId=${reportId}`;
@@ -1790,7 +1865,12 @@
             initMap();
             loadUserCounts(); // Load user role counts
             loadAllAnnouncements(); // Load all announcements
-            loadRecentReports(); // Load recent pending reports
+            
+            // Add delay to ensure Firebase is properly initialized before loading reports
+            setTimeout(() => {
+                loadRecentReports(); // Load recent pending reports
+                updateTotalReportsCount(); // Update total reports count
+            }, 1000);
             
             // Setup toggle button event listener
             document.getElementById('toggleUserView').addEventListener('click', toggleUserBreakdown);
@@ -1802,7 +1882,10 @@
             setInterval(cleanupExpiredAnnouncements, 60 * 60 * 1000);
             
             // Auto-refresh recent reports every 30 seconds
-            setInterval(loadRecentReports, 30000);
+            setInterval(() => {
+                loadRecentReports();
+                updateTotalReportsCount();
+            }, 30000);
         });
     </script>
 </body>

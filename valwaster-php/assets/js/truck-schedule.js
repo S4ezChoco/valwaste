@@ -227,11 +227,14 @@ function loadWasteCollectors() {
         'Domingo Ochoa', 'Florencio Diaz', 'Patricio Velasco', 'Rogelio Estrada', 'Christian Gutierrez'
     ];
     
-    // Convert to collector objects
+    // Convert to collector objects - assign random barangays so they work with filtering
+    const barangays = ['Bagbaguin', 'Balangkas', 'Bignay', 'Canumay East', 'Canumay West', 'Coloong', 'Dalandanan', 'Gen. T. de Leon', 'Hen. T. de Leon', 'Isla', 'Karuhatan', 'Lawang Bato', 'Lingunan', 'Mabolo', 'Malanday', 'Malinta', 'Mapulang Lupa', 'Marulas', 'Maysan', 'Palasan', 'Parada', 'Paso de Blas', 'Pasolo', 'Poblacion', 'Pulo', 'Rincon', 'Tagalag', 'Ugong', 'Viente Reales', 'Wawang Pulo'];
+    
     allCollectors = filipinoCollectors.map((name, index) => ({
         id: `collector_${index + 1}`,
         displayName: name,
-        role: 'Waste Collector'
+        role: 'Waste Collector',
+        barangay: barangays[index % barangays.length] // Cycle through barangays
     }));
     
     // Initial render shows all collectors
@@ -659,8 +662,8 @@ function selectDriver(driverId, driverName, driverData) {
         renderDrivers();
         renderCollectors();
         
-        // Clear previously selected collectors if they're not from the same barangay
-        selectedCollectors = selectedCollectors.filter(c => c.barangay === driverData.barangay);
+        // Don't clear selected collectors for static list - they work across all barangays
+        // selectedCollectors = selectedCollectors.filter(c => c.barangay === driverData.barangay);
         updateCollectorsDisplay();
         
         // Pin the barangay on the map (but don't replace street checklist)
@@ -1211,8 +1214,8 @@ function handleStreetSelection(streetObj, isChecked) {
                 document.getElementById('selected-driver').value = '';
             }
             
-            // Clear selected collectors from different barangays
-            selectedCollectors = selectedCollectors.filter(c => c.barangay === streetBarangay);
+            // Don't clear selected collectors for static list - they work across all barangays
+            // selectedCollectors = selectedCollectors.filter(c => c.barangay === streetBarangay);
             updateCollectorsDisplay();
             
             // Re-render drivers and collectors with the new filter
@@ -1302,14 +1305,21 @@ function handleCreateSchedule(event) {
     const startTime = document.getElementById('start-time').value;
     const endTime = document.getElementById('end-time').value;
     
+    // Debug logging to see what's happening
+    console.log('Schedule creation - selectedDriverId:', selectedDriverId);
+    console.log('Schedule creation - selectedCollectors:', selectedCollectors);
+    console.log('Schedule creation - selectedCollectors length:', selectedCollectors.length);
+    
     // Validate required fields
     if (!selectedDriverId) {
+        console.log('Driver validation failed');
         showError('Please select a driver.');
         return;
     }
     
     if (selectedCollectors.length !== 3) {
-        showError('Please select exactly 3 waste collectors.');
+        console.log('Collectors validation failed - count:', selectedCollectors.length);
+        showError(`Please select exactly 3 waste collectors. Currently selected: ${selectedCollectors.length}`);
         return;
     }
     
@@ -1892,14 +1902,21 @@ function handleCreateScheduleWithApprovedRequest(event) {
     const startTime = document.getElementById('start-time').value;
     const endTime = document.getElementById('end-time').value;
     
+    // Debug logging to see what's happening
+    console.log('Schedule with approved request - selectedDriverId:', selectedDriverId);
+    console.log('Schedule with approved request - selectedCollectors:', selectedCollectors);
+    console.log('Schedule with approved request - selectedCollectors length:', selectedCollectors.length);
+    
     // Validate required fields
     if (!selectedDriverId) {
+        console.log('Driver validation failed');
         showError('Please select a driver.');
         return;
     }
     
     if (selectedCollectors.length !== 3) {
-        showError('Please select exactly 3 waste collectors.');
+        console.log('Collectors validation failed - count:', selectedCollectors.length);
+        showError(`Please select exactly 3 waste collectors. Currently selected: ${selectedCollectors.length}`);
         return;
     }
     
