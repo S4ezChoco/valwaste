@@ -1674,7 +1674,7 @@ class _MapScreenState extends State<MapScreen>
 
     return Positioned(
       bottom: 20,
-      left: 16,
+      left: 80, // Move right to avoid zoom controls
       right: 16,
       child: Container(
         padding: const EdgeInsets.all(20),

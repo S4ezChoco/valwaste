@@ -27,8 +27,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadUserData() async {
     try {
-      print('ProfileScreen: Loading user data with force refresh...');
-      final user = await FirebaseAuthService.getCurrentUserWithForceRefresh();
+      print('ProfileScreen: Loading user data...');
+      // Use current user instead of force refresh to avoid tab issues
+      final user = FirebaseAuthService.currentUser;
       print(
         'ProfileScreen: User data loaded: ${user?.name ?? 'null'} (${user?.roleString ?? 'null'})',
       );
@@ -486,175 +487,205 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            // User Details
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                child: Column(
-                  children: [
-                    // Profile Picture
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.primary, width: 3),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
+            // User Details - Compact Layout
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  // Compact Profile Section
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.primary.withOpacity(0.1),
+                          AppColors.primary.withOpacity(0.05),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.person,
-                        size: 50,
-                        color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.primary.withOpacity(0.2),
+                        width: 1,
                       ),
                     ),
-                    const SizedBox(height: AppSizes.paddingMedium),
-
-                    // User Name
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSizes.paddingMedium,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(
-                          AppSizes.radiusMedium,
-                        ),
-                      ),
-                      child: Text(
-                        _currentUser?.name ?? 'User',
-                        style: AppTextStyles.heading3.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSizes.paddingMedium),
-
-                    // User Role
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSizes.paddingMedium,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(
-                          AppSizes.radiusMedium,
-                        ),
-                        border: Border.all(
-                          color: AppColors.primary.withOpacity(0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _getRoleIcon(_currentUser?.role),
-                            color: AppColors.primary,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _currentUser?.roleString ?? 'Unknown Role',
-                            style: AppTextStyles.body1.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSizes.paddingMedium),
-
-                    // Information Cards
-                    _buildDetailCard(
-                      icon: Icons.email,
-                      title: 'Email',
-                      value: _currentUser?.email ?? 'No email',
-                    ),
-                    const SizedBox(height: 6),
-
-                    if (_currentUser?.phone != null &&
-                        _currentUser!.phone.isNotEmpty) ...[
-                      _buildDetailCard(
-                        icon: Icons.phone,
-                        title: 'Phone',
-                        value: _currentUser!.phone,
-                      ),
-                      const SizedBox(height: 6),
-                    ],
-
-                    if (_currentUser?.address != null &&
-                        _currentUser!.address.isNotEmpty) ...[
-                      _buildDetailCard(
-                        icon: Icons.location_on,
-                        title: 'Address',
-                        value: _currentUser!.address,
-                      ),
-                      const SizedBox(height: 6),
-                    ],
-
-                    if (_currentUser?.barangay != null &&
-                        _currentUser!.barangay.isNotEmpty)
-                      _buildDetailCard(
-                        icon: Icons.location_city,
-                        title: 'Barangay',
-                        value: _currentUser!.barangay,
-                      ),
-
-                    const SizedBox(height: AppSizes.paddingMedium),
-
-                    // Logout Button
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(
-                          AppSizes.radiusMedium,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.error.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton(
-                        onPressed: _showLogoutDialog,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.error,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: AppSizes.paddingMedium,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppSizes.radiusMedium,
-                            ),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                    child: Column(
+                      children: [
+                        // Compact Profile Picture
+                        Stack(
                           children: [
-                            const Icon(Icons.logout, size: 18),
-                            const SizedBox(width: AppSizes.paddingSmall),
-                            Text('Log out', style: AppTextStyles.button),
+                            Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    AppColors.primary,
+                                    AppColors.primary.withOpacity(0.8),
+                                  ],
+                                ),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primary.withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.person,
+                                size: 40,
+                                color: Colors.white,
+                              ),
+                            ),
+                            // Online status indicator
+                            Positioned(
+                              bottom: 4,
+                              right: 4,
+                              child: Container(
+                                width: 16,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: Colors.green,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
+                        const SizedBox(height: 12),
+
+                        // Compact User Name
+                        Text(
+                          _currentUser?.name ?? 'User',
+                          style: AppTextStyles.heading3.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Compact User Role Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.primary,
+                                AppColors.primary.withOpacity(0.8),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.2),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _getRoleIcon(_currentUser?.role),
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _currentUser?.roleString ?? 'Unknown Role',
+                                style: AppTextStyles.body2.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Compact Information Cards
+                  _buildCompactDetailCard(
+                    icon: Icons.email_outlined,
+                    title: 'Email',
+                    value: _currentUser?.email ?? 'No email',
+                    color: Colors.blue,
+                  ),
+                  const SizedBox(height: 8),
+
+                  if (_currentUser?.phone != null &&
+                      _currentUser!.phone.isNotEmpty) ...[
+                    _buildCompactDetailCard(
+                      icon: Icons.phone_outlined,
+                      title: 'Phone',
+                      value: _currentUser!.phone,
+                      color: Colors.green,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+
+                  if (_currentUser?.address != null &&
+                      _currentUser!.address.isNotEmpty) ...[
+                    _buildCompactDetailCard(
+                      icon: Icons.home_outlined,
+                      title: 'Address',
+                      value: _currentUser!.address,
+                      color: Colors.orange,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+
+                  if (_currentUser?.barangay != null &&
+                      _currentUser!.barangay.isNotEmpty)
+                    _buildCompactDetailCard(
+                      icon: Icons.location_city_outlined,
+                      title: 'Barangay',
+                      value: _currentUser!.barangay,
+                      color: Colors.purple,
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  // Compact Logout Button
+                  TextButton.icon(
+                    onPressed: _showLogoutDialog,
+                    icon: const Icon(
+                      Icons.logout,
+                      color: AppColors.error,
+                      size: 16,
+                    ),
+                    label: Text(
+                      'Log out',
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.error,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ],
-                ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 6,
+                        horizontal: 12,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -678,22 +709,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
-            blurRadius: 3,
-            offset: const Offset(0, 1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(AppSizes.radiusSmall),
-            ),
-            child: Icon(icon, color: AppColors.primary, size: 20),
-          ),
+          Icon(icon, color: AppColors.primary, size: 20),
           const SizedBox(width: AppSizes.paddingMedium),
           Expanded(
             child: Column(
@@ -701,16 +724,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 Text(
                   title,
-                  style: AppTextStyles.body2.copyWith(
+                  style: AppTextStyles.caption.copyWith(
                     color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   value,
                   style: AppTextStyles.body1.copyWith(
-                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -721,58 +744,292 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildEnhancedDetailCard({
+    required IconData icon,
+    required String title,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: color.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    style: AppTextStyles.body1.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactDetailCard({
+    required IconData icon,
+    required String title,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.08),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(
+          color: color.withOpacity(0.15),
+          width: 1,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: AppTextStyles.body2.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showLogoutDialog() {
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (BuildContext context) {
-        return AlertDialog(
+        return Dialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
+            borderRadius: BorderRadius.circular(24),
           ),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: AppColors.error.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppSizes.radiusSmall),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-                child: const Icon(
-                  Icons.logout,
-                  color: AppColors.error,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Text('Logout', style: TextStyle(fontSize: 16)),
-            ],
-          ),
-          content: const Text('Are you sure you want to logout?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
+              ],
             ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                await FirebaseAuthService.logout();
-                if (mounted) {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Compact Title
+                Text(
+                  'Logout Confirmation',
+                  style: AppTextStyles.heading3.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                
+                // Compact Description
+                Text(
+                  'Are you sure you want to logout?',
+                  style: AppTextStyles.body1.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                
+                // Enhanced Action Buttons
+                Row(
+                  children: [
+                    // Cancel Button
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: AppColors.border,
+                            width: 1.5,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => Navigator.of(context).pop(),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 16,
+                              ),
+                              child: Text(
+                                'Cancel',
+                                style: AppTextStyles.body1.copyWith(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                    (route) => false,
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Logout'),
+                    const SizedBox(width: 16),
+                    
+                    // Logout Button
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.error,
+                              AppColors.error.withOpacity(0.8),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.error.withOpacity(0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () async {
+                              Navigator.of(context).pop();
+                              await FirebaseAuthService.logout();
+                              if (mounted) {
+                                Navigator.of(context).pushAndRemoveUntil(
+                                  MaterialPageRoute(
+                                    builder: (context) => const LoginScreen(),
+                                  ),
+                                  (route) => false,
+                                );
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 16,
+                              ),
+                              child: Text(
+                                'Logout',
+                                style: AppTextStyles.body1.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );

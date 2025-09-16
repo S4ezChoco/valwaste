@@ -233,11 +233,11 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
                       const SizedBox(width: AppSizes.paddingMedium),
                       Expanded(
                         child: _StatCard(
-                          title: 'This Month',
-                          value: '${_stats['thisMonthCollections'] ?? 0}',
-                          icon: Icons.calendar_month,
-                          color: Colors.blue,
-                          subtitle: 'Current month',
+                          title: 'Total Weight',
+                          value: '${(_stats['totalWeight'] ?? 0.0).toStringAsFixed(1)} kg',
+                          icon: Icons.scale,
+                          color: Colors.purple,
+                          subtitle: 'Waste collected',
                         ),
                       ),
                     ],
