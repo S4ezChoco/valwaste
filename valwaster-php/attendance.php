@@ -80,7 +80,6 @@
                                     <th>Check-In</th>
                                     <th>Check-Out</th>
                                     <th>Status</th>
-                                    <th class="col-actions">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="attendance-table-body">

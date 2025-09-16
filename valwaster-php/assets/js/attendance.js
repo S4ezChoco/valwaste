@@ -243,7 +243,7 @@ function renderAttendanceTable() {
         console.log('🔄 No filtered data found, showing empty state');
     tbody.innerHTML = `
         <tr class="empty">
-            <td colspan="6" style="text-align: center; color: #6b7280; padding: 40px 12px;">
+            <td colspan="5" style="text-align: center; color: #6b7280; padding: 40px 12px;">
                 ${currentTab === 'pending-verification' ? 'No pending verification records' : 'No attendance records found'}
             </td>
         </tr>
@@ -317,37 +317,51 @@ function renderAttendanceTable() {
             <td>
                 <span class="att-badge ${getStatusBadgeClass(record.status)}">${getStatusLabel(record.status)}</span>
             </td>
-            <td class="att-actions">
-                <button class="btn-soft-sm" onclick="openDetailsModal('${record.id}')">Details</button>
-            </td>
         </tr>
         ${record.expanded ? `
             <tr class="att-expand">
-                <td colspan="6">
-                    <div class="att-expand-grid">
-                        <div class="att-col">
-                            <div class="att-expand-title">Team Members</div>
-                            <ul class="att-member-list">
-                                <li class="att-member-row">
-                                    <span class="att-role-pill">Driver</span>
-                                    <span class="att-member-name">${record.driver}</span>
-                                </li>
-                                ${record.members.map(m => `
-                                    <li class="att-member-row">
-                                        <span class="${getChipClass(m.role)}">${getChipLabel(m.role)}</span>
-                                        <span class="att-member-name">${m.name}</span>
-                                    </li>
-                                `).join('')}
-                            </ul>
-                        </div>
-                        <div class="att-col">
-                            <div class="att-expand-title">Additional Information</div>
-                            <div class="att-kv">
-                                <span class="att-k">Location:</span>
-                                <span class="att-v">${record.location || '—'}</span>
+                <td colspan="5">
+                    <div class="att-details-container">
+                        <div class="att-details-grid">
+                            <div class="att-detail-section">
+                                <h4>Driver Information</h4>
+                                <div class="att-detail-row"><span>Name:</span> ${record.driverName || 'N/A'}</div>
+                                <div class="att-detail-row"><span>Driver ID:</span> ${record.driverId || 'N/A'}</div>
+                                <div class="att-detail-row"><span>Truck:</span> ${record.truckInfo || 'N/A'}</div>
+                                <div class="att-detail-row"><span>Plate Number:</span> ${record.plateNumber || 'N/A'}</div>
                             </div>
-                            <div class="att-note">${record.notes || '—'}</div>
+                            
+                            <div class="att-detail-section">
+                                <h4>Attendance Times</h4>
+                                <div class="att-detail-row"><span>Check-In:</span> ${record.checkInTime ? new Date(record.checkInTime).toLocaleString() : 'N/A'}</div>
+                                <div class="att-detail-row"><span>Check-Out:</span> ${record.checkOutTime ? new Date(record.checkOutTime).toLocaleString() : 'N/A'}</div>
+                                <div class="att-detail-row"><span>Total Hours:</span> ${formatHours(record.totalHours)}</div>
+                            </div>
+                            
+                            <div class="att-detail-section">
+                                <h4>Work Summary</h4>
+                                <div class="att-detail-row"><span>Collections:</span> ${record.collectionsCompleted || 0}</div>
+                                <div class="att-detail-row"><span>Location:</span> ${record.location || 'N/A'}</div>
+                                <div class="att-detail-row"><span>Status:</span> <span class="att-badge ${getStatusBadgeClass(record.status)}">${getStatusLabel(record.status)}</span></div>
+                            </div>
                         </div>
+                        ${record.members && record.members.length > 0 ? `
+                            <div class="att-team-members">
+                                <h4>Team Members</h4>
+                                <div class="att-members-grid">
+                                    <div class="att-member-item">
+                                        <span class="att-role-pill">Driver</span>
+                                        <span>${record.driverName || 'Unknown Driver'}</span>
+                                    </div>
+                                    ${record.members.map(m => `
+                                        <div class="att-member-item">
+                                            <span class="${getChipClass(m.role)}">${getChipLabel(m.role)}</span>
+                                            <span>${m.name}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
                 </td>
             </tr>
@@ -397,19 +411,18 @@ function getChipLabel(role) {
 // Toggle expand row
 function toggleExpand(id) {
     console.log('🔄 Toggle expand clicked for ID:', id);
-    console.log('🔄 Current attendanceData before toggle:', attendanceData);
     
     // Find the record and toggle its expanded state
-    for (let i = 0; i < attendanceData.length; i++) {
-        if (attendanceData[i].id === id) {
-            attendanceData[i].expanded = !attendanceData[i].expanded;
-            console.log('🔄 Toggled expanded state for record:', attendanceData[i]);
-            break;
-        }
+    const record = attendanceData.find(r => r.id === id);
+    if (record) {
+        record.expanded = !record.expanded;
+        console.log('🔄 Toggled expanded state for record:', record);
+        
+        // Re-render the table to show/hide the details
+        renderAttendanceTable();
+    } else {
+        console.error('❌ Record not found for ID:', id);
     }
-    
-    console.log('🔄 Current attendanceData after toggle:', attendanceData);
-    renderAttendanceTable();
 }
 
 // Modal functions
@@ -773,6 +786,23 @@ function formatDateTime(date) {
     const minutes = String(date.getMinutes()).padStart(2, '0');
     
     return `${months[date.getMonth()]} ${date.getDate()}, ${String(hours).padStart(2,'0')}:${minutes} ${ampm}`;
+}
+
+// Format hours to display properly (e.g., 0.16666666 -> "10 minutes")
+function formatHours(hours) {
+    if (!hours || hours === 0) return '0 hours';
+    
+    const totalMinutes = Math.round(hours * 60);
+    const wholeHours = Math.floor(totalMinutes / 60);
+    const remainingMinutes = totalMinutes % 60;
+    
+    if (wholeHours === 0) {
+        return `${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}`;
+    } else if (remainingMinutes === 0) {
+        return `${wholeHours} hour${wholeHours !== 1 ? 's' : ''}`;
+    } else {
+        return `${wholeHours}h ${remainingMinutes}m`;
+    }
 }
 
 function updatePendingCount() {
