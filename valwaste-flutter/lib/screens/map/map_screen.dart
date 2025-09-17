@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../navigation/native_navigation_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
@@ -56,6 +57,11 @@ class _MapScreenState extends State<MapScreen>
   // Driver location tracking
   LatLng? _driverLocation;
   StreamSubscription<DocumentSnapshot>? _driverLocationSubscription;
+
+  // Real-time user locations tracking
+  List<Map<String, dynamic>> _userLocations = [];
+  StreamSubscription<List<Map<String, dynamic>>>? _userLocationsSubscription;
+  bool _showUserLocations = true;
 
   // Announcement system
   Map<String, dynamic>? _currentAnnouncement;
@@ -118,6 +124,7 @@ class _MapScreenState extends State<MapScreen>
       _initializeMap();
       _startLocationTracking();
       _setupCollectionRequestsListener();
+      _setupUserLocationsListener(); // Setup real-time user locations listener
       _setupAnnouncementListener(); // Setup announcement listener
       _loadAssignedDriverInfo(); // Load assigned driver info
       _isMapInitialized = true;
@@ -398,8 +405,9 @@ class _MapScreenState extends State<MapScreen>
                     initialCenter:
                         _currentLocation ?? const LatLng(14.7000, 120.9833),
                     initialZoom: 12.0,
-                    minZoom: 8.0,  // Limit zoom out to Philippines area only
-                    maxZoom: 18.0, // Prevent zooming in too much to avoid white screen
+                    minZoom: 8.0, // Limit zoom out to Philippines area only
+                    maxZoom:
+                        18.0, // Prevent zooming in too much to avoid white screen
                     interactionOptions: const InteractionOptions(
                       flags: InteractiveFlag.all,
                       enableMultiFingerGestureRace: true,
@@ -420,10 +428,10 @@ class _MapScreenState extends State<MapScreen>
                       userAgentPackageName: 'com.example.valwaste',
                       maxZoom: 18, // Reduced to prevent tile loading issues
                       minZoom: 10, // Prevent zooming out too far
-                      subdomains: _isSatelliteView || _showTraffic ? ['0', '1', '2', '3'] : const [],
-                      additionalOptions: const {
-                        'tileSize': '256',
-                      },
+                      subdomains: _isSatelliteView || _showTraffic
+                          ? ['0', '1', '2', '3']
+                          : const [],
+                      additionalOptions: const {'tileSize': '256'},
                       tileProvider: NetworkTileProvider(),
                     ),
                     // Current location marker
@@ -497,6 +505,9 @@ class _MapScreenState extends State<MapScreen>
                     MarkerLayer(markers: _wasteCollectionPoints),
                     // Real-time collection requests
                     MarkerLayer(markers: _getCollectionRequestMarkers()),
+                    // Real-time user locations
+                    if (_showUserLocations)
+                      MarkerLayer(markers: _getUserLocationMarkers()),
                     // Selected barangay marker
                     if (_selectedBarangayLocation != null)
                       MarkerLayer(
@@ -673,7 +684,7 @@ class _MapScreenState extends State<MapScreen>
   Widget _buildVerticalButtonOverlay() {
     return Positioned(
       right: 16,
-      bottom: 100, // Position above the bottom navigation
+      bottom: 200, // Position higher to avoid collection request card overlap
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -687,6 +698,18 @@ class _MapScreenState extends State<MapScreen>
               isActive: _showCollectionRequests,
               heroTag: "requests",
             ),
+          const SizedBox(height: 8),
+          // User locations toggle button
+          _buildFloatingButton(
+            icon: _showUserLocations ? Icons.people : Icons.people_outline,
+            onPressed: () {
+              setState(() {
+                _showUserLocations = !_showUserLocations;
+              });
+            },
+            isActive: _showUserLocations,
+            heroTag: "user_locations",
+          ),
           const SizedBox(height: 8),
           // Traffic toggle button
           _buildFloatingButton(
@@ -1003,6 +1026,7 @@ class _MapScreenState extends State<MapScreen>
             final longitude = data['longitude']?.toDouble();
 
             print('🔍 Driver location update: lat=$latitude, lng=$longitude');
+            print('🔍 Driver location data fields: ${data.keys.toList()}');
 
             if (latitude != null && longitude != null) {
               _throttleMapUpdate(() {
@@ -1029,10 +1053,10 @@ class _MapScreenState extends State<MapScreen>
   /// Throttle map updates to prevent grey tiles
   void _throttleMapUpdate(VoidCallback callback) {
     if (_isMapUpdating) return;
-    
+
     _isMapUpdating = true;
     _mapUpdateTimer?.cancel();
-    
+
     _mapUpdateTimer = Timer(const Duration(milliseconds: 1000), () {
       callback();
       _isMapUpdating = false;
@@ -1499,7 +1523,8 @@ class _MapScreenState extends State<MapScreen>
                           radius: 20,
                           backgroundColor: Colors.blue.shade100,
                           child: Text(
-                            driverInfo['name']?.substring(0, 1).toUpperCase() ?? 'D',
+                            driverInfo['name']?.substring(0, 1).toUpperCase() ??
+                                'D',
                             style: TextStyle(
                               color: Colors.blue.shade700,
                               fontWeight: FontWeight.bold,
@@ -1622,7 +1647,8 @@ class _MapScreenState extends State<MapScreen>
                             GestureDetector(
                               onTap: () {
                                 if (_assignedDriverInfo != null) {
-                                  final driverId = _assignedDriverInfo!['id'] as String?;
+                                  final driverId =
+                                      _assignedDriverInfo!['id'] as String?;
                                   if (driverId != null) {
                                     _getInitialDriverLocation(driverId);
                                   }
@@ -1692,11 +1718,17 @@ class _MapScreenState extends State<MapScreen>
                     if (collection != null) ...[
                       Row(
                         children: [
-                          Icon(Icons.location_on, color: Colors.red.shade600, size: 16),
+                          Icon(
+                            Icons.location_on,
+                            color: Colors.red.shade600,
+                            size: 16,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              BarangayData.formatLocationDisplay(collection.address),
+                              BarangayData.formatLocationDisplay(
+                                collection.address,
+                              ),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey.shade700,
@@ -1718,7 +1750,10 @@ class _MapScreenState extends State<MapScreen>
                           const SizedBox(width: 8),
                           Text(
                             'Estimated Arrival: ${driverInfo['estimatedArrival'] ?? 'Calculating...'}',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
+                            ),
                           ),
                         ],
                       ),
@@ -1740,7 +1775,7 @@ class _MapScreenState extends State<MapScreen>
     final collection = _selectedCollectionRequest!;
 
     return Positioned(
-      bottom: 20,
+      bottom: 120, // Move up to avoid announcement card overlap
       left: 80, // Move right to avoid zoom controls
       right: 16,
       child: Container(
@@ -1988,7 +2023,7 @@ class _MapScreenState extends State<MapScreen>
   Widget _buildZoomControls() {
     return Positioned(
       left: 16,
-      bottom: 20,
+      bottom: 20, // Keep at bottom for announcement card
       child: Row(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -2590,7 +2625,9 @@ class _MapScreenState extends State<MapScreen>
       final todayString =
           '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-      print('🔄 Looking for today\'s schedule: $todayString for driver: ${currentUser.id}');
+      print(
+        '🔄 Looking for today\'s schedule: $todayString for driver: ${currentUser.id}',
+      );
 
       // Query for today's scheduled collections - same logic as driver_collections_screen
       QuerySnapshot? querySnapshot;
@@ -2628,12 +2665,18 @@ class _MapScreenState extends State<MapScreen>
       }
 
       if (querySnapshot != null && querySnapshot.docs.isNotEmpty) {
-        final scheduleData = querySnapshot.docs.first.data() as Map<String, dynamic>;
+        final scheduleData =
+            querySnapshot.docs.first.data() as Map<String, dynamic>;
         print('✅ Found today\'s scheduled collection');
-        
+
         return {
-          'location': BarangayData.formatLocationDisplay(scheduleData['address'] ?? ''),
-          'date': scheduleData['scheduledDate'] ?? scheduleData['scheduled_date'] ?? todayString,
+          'location': BarangayData.formatLocationDisplay(
+            scheduleData['address'] ?? '',
+          ),
+          'date':
+              scheduleData['scheduledDate'] ??
+              scheduleData['scheduled_date'] ??
+              todayString,
           'wasteType': scheduleData['waste_type'] ?? 'General',
           'user_name': scheduleData['user_name'] ?? 'Unknown',
           'latitude': scheduleData['latitude'],
@@ -3164,6 +3207,41 @@ class _MapScreenState extends State<MapScreen>
     }
   }
 
+  /// Setup real-time user locations listener
+  void _setupUserLocationsListener() {
+    print('MapScreen: Setting up user locations listener');
+
+    _userLocationsSubscription =
+        LocationTrackingService.getUserLocationsStream().listen(
+          (userLocations) {
+            print(
+              'User locations updated: ${userLocations.length} users online',
+            );
+
+            // Debug: Print details of each user location
+            for (final user in userLocations) {
+              final role = user['userRole'] as String?;
+              final name = user['userName'] as String?;
+              final location = user['location'] as Map<String, dynamic>?;
+              if (location != null) {
+                final lat = location['latitude'] as double?;
+                final lng = location['longitude'] as double?;
+                print('  - $role: $name at ($lat, $lng)');
+              }
+            }
+
+            if (mounted) {
+              setState(() {
+                _userLocations = userLocations;
+              });
+            }
+          },
+          onError: (error) {
+            print('Error in user locations stream: $error');
+          },
+        );
+  }
+
   /// Get collection request markers for the map
   List<Marker> _getCollectionRequestMarkers() {
     if (!_showCollectionRequests) {
@@ -3351,6 +3429,119 @@ class _MapScreenState extends State<MapScreen>
     return markers;
   }
 
+  /// Get real-time user location markers for the map
+  List<Marker> _getUserLocationMarkers() {
+    if (!_showUserLocations || _userLocations.isEmpty) {
+      return [];
+    }
+
+    final currentUser = FirebaseAuthService.currentUser;
+    final markers = <Marker>[];
+
+    for (final userLocation in _userLocations) {
+      final location = userLocation['location'] as Map<String, dynamic>?;
+      if (location == null) continue;
+
+      final latitude = location['latitude'] as double?;
+      final longitude = location['longitude'] as double?;
+      if (latitude == null || longitude == null) continue;
+
+      final userRole = userLocation['userRole'] as String?;
+      final userId = userLocation['userId'] as String?;
+
+      // Skip current user's own location
+      if (userId == currentUser?.id) continue;
+
+      // Only show residents and drivers
+      if (userRole != 'Resident' && userRole != 'Driver') continue;
+
+      final coords = LatLng(latitude, longitude);
+      final isDriver = userRole == 'Driver';
+
+      markers.add(
+        Marker(
+          point: coords,
+          width: 40,
+          height: 40,
+          child: GestureDetector(
+            onTap: () {
+              _showUserLocationInfo(userLocation);
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDriver
+                    ? Colors.green.withValues(alpha: 0.9)
+                    : Colors.blue.withValues(alpha: 0.9),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: (isDriver ? Colors.green : Colors.blue).withValues(
+                      alpha: 0.3,
+                    ),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(
+                isDriver ? Icons.local_shipping : Icons.person,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return markers;
+  }
+
+  /// Show user location info popup
+  void _showUserLocationInfo(Map<String, dynamic> userLocation) {
+    final userName = userLocation['userName'] as String? ?? 'Unknown User';
+    final userRole = userLocation['userRole'] as String? ?? 'Unknown Role';
+    final barangay = userLocation['barangay'] as String? ?? 'Unknown Barangay';
+    final location = userLocation['location'] as Map<String, dynamic>?;
+    final latitude = location?['latitude'] as double?;
+    final longitude = location?['longitude'] as double?;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              userRole == 'Driver' ? Icons.local_shipping : Icons.person,
+              color: userRole == 'Driver' ? Colors.green : Colors.blue,
+            ),
+            const SizedBox(width: 8),
+            Text(userName),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Role: $userRole'),
+            Text('Barangay: $barangay'),
+            if (latitude != null && longitude != null)
+              Text(
+                'Location: ${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}',
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Get online user markers for the map
 
   /// Build glowing user marker with animation and chat bubble name label
@@ -3477,30 +3668,20 @@ class _MapScreenState extends State<MapScreen>
         destinationCoords = barangayCoords;
       }
 
-      // Create Google Maps URL with directions
-      final origin = '${currentLocation.latitude},${currentLocation.longitude}';
-      final destination =
-          '${destinationCoords.latitude},${destinationCoords.longitude}';
-      final googleMapsUrl =
-          'https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination&travelmode=driving';
-
-      // Launch Google Maps in external app
+      // Navigate to native navigation screen
       if (mounted) {
-        try {
-          await launchUrl(
-            Uri.parse(googleMapsUrl),
-            mode: LaunchMode.externalApplication,
-          );
-        } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Could not open Google Maps. Please install the app.',
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => NativeNavigationScreen(
+              currentLocation: LatLng(
+                currentLocation.latitude,
+                currentLocation.longitude,
               ),
-              backgroundColor: Colors.orange,
+              destination: destinationCoords,
+              destinationName: 'Collection Location',
             ),
-          );
-        }
+          ),
+        );
       }
     } catch (e) {
       print('Error opening Google Maps: $e');
@@ -3564,6 +3745,7 @@ class _MapScreenState extends State<MapScreen>
       _mapController = null;
       _collectionRequestsSubscription?.cancel();
       _driverLocationSubscription?.cancel();
+      _userLocationsSubscription?.cancel();
       _announcementSubscription?.cancel();
       _mapUpdateTimer?.cancel();
     } catch (e) {

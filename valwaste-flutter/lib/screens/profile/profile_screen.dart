@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/constants.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../models/user.dart';
@@ -25,10 +26,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadUserData();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh user data when screen becomes visible
+    _loadUserData();
+  }
+
   Future<void> _loadUserData() async {
     try {
       print('ProfileScreen: Loading user data...');
-      // Use current user instead of force refresh to avoid tab issues
+      // Force refresh user data from Firestore to get latest changes
+      await FirebaseAuthService.forceRefreshUserData();
       final user = FirebaseAuthService.currentUser;
       print(
         'ProfileScreen: User data loaded: ${user?.name ?? 'null'} (${user?.roleString ?? 'null'})',
@@ -479,6 +488,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const Spacer(),
+                  // Edit button
+                  IconButton(
+                    onPressed: () => _showEditProfileDialog(context),
+                    icon: const Icon(Icons.edit, color: AppColors.primary),
+                    tooltip: 'Edit Profile',
+                  ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close),
@@ -762,10 +777,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             offset: const Offset(0, 4),
           ),
         ],
-        border: Border.all(
-          color: color.withOpacity(0.2),
-          width: 1,
-        ),
+        border: Border.all(color: color.withOpacity(0.2), width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -778,11 +790,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 24,
-              ),
+              child: Icon(icon, color: color, size: 24),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -833,10 +841,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             offset: const Offset(0, 2),
           ),
         ],
-        border: Border.all(
-          color: color.withOpacity(0.15),
-          width: 1,
-        ),
+        border: Border.all(color: color.withOpacity(0.15), width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -849,11 +854,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 18,
-              ),
+              child: Icon(icon, color: color, size: 18),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -923,7 +924,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-                
+
                 // Compact Description
                 Text(
                   'Are you sure you want to logout?',
@@ -933,7 +934,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Enhanced Action Buttons
                 Row(
                   children: [
@@ -971,7 +972,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    
+
                     // Logout Button
                     Expanded(
                       child: Container(
@@ -1066,6 +1067,689 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return 'Welcome back, administrator!';
       default:
         return 'Welcome back!';
+    }
+  }
+
+  /// Show edit profile dialog
+  void _showEditProfileDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => _EditProfileDialog(
+        currentUser: _currentUser,
+        onProfileUpdated: () {
+          // Refresh user data after update
+          _loadUserData();
+        },
+      ),
+    );
+  }
+}
+
+/// Edit Profile Dialog
+class _EditProfileDialog extends StatefulWidget {
+  final UserModel? currentUser;
+  final VoidCallback onProfileUpdated;
+
+  const _EditProfileDialog({
+    required this.currentUser,
+    required this.onProfileUpdated,
+  });
+
+  @override
+  State<_EditProfileDialog> createState() => _EditProfileDialogState();
+}
+
+class _EditProfileDialogState extends State<_EditProfileDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _currentPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  String? _selectedBarangay;
+
+  // List of barangays in Valenzuela City
+  final List<String> _barangays = [
+    'Arkong Bato',
+    'Bagbaguin',
+    'Balangkas',
+    'Bignay',
+    'Bisig',
+    'Canumay East',
+    'Canumay West',
+    'Coloong',
+    'Dalandanan',
+    'Gen. T. De Leon',
+    'Isla',
+    'Karuhatan',
+    'Lawang Bato',
+    'Lingunan',
+    'Mabolo',
+    'Malanday',
+    'Mapulang Lupa',
+    'Marulas',
+    'Maysan',
+    'Palasan',
+    'Parada',
+    'Pariancillo Villa',
+    'Pasolo',
+    'Paso de Blas',
+    'Poblacion',
+    'Polo',
+    'Punturin',
+    'Rincon',
+    'Tagalag',
+    'Ugong',
+    'Viente Reales',
+    'Wawang Pulo',
+  ];
+
+  bool _isLoading = false;
+  bool _obscureCurrentPassword = true;
+  bool _obscureNewPassword = true;
+  bool _obscureConfirmPassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.text = widget.currentUser?.name ?? '';
+    _selectedBarangay = widget.currentUser?.barangay;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Container(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.9,
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Compact Header with Gradient
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary,
+                      AppColors.primary.withOpacity(0.8),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.edit_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Edit Profile',
+                        style: AppTextStyles.heading3.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        padding: const EdgeInsets.all(6),
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Form Content
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Personal Information Section
+                        _buildSectionHeader(
+                          'Personal Information',
+                          Icons.person_outline,
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Name field
+                        _buildEnhancedTextField(
+                          controller: _nameController,
+                          label: 'Full Name',
+                          icon: Icons.person_rounded,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter your name';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Barangay dropdown
+                        _buildBarangayDropdown(),
+                        const SizedBox(height: 20),
+
+                        // Password Section
+                        _buildSectionHeader(
+                          'Change Password',
+                          Icons.lock_outline,
+                          isOptional: true,
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Current password field
+                        _buildEnhancedTextField(
+                          controller: _currentPasswordController,
+                          label: 'Current Password',
+                          icon: Icons.lock_rounded,
+                          isPassword: true,
+                          obscureText: _obscureCurrentPassword,
+                          onToggleVisibility: () {
+                            setState(() {
+                              _obscureCurrentPassword =
+                                  !_obscureCurrentPassword;
+                            });
+                          },
+                          validator: (value) {
+                            if (_newPasswordController.text.isNotEmpty &&
+                                (value == null || value.isEmpty)) {
+                              return 'Current password is required to change password';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+
+                        // New password field
+                        _buildEnhancedTextField(
+                          controller: _newPasswordController,
+                          label: 'New Password',
+                          icon: Icons.lock_outline_rounded,
+                          isPassword: true,
+                          obscureText: _obscureNewPassword,
+                          onToggleVisibility: () {
+                            setState(() {
+                              _obscureNewPassword = !_obscureNewPassword;
+                            });
+                          },
+                          validator: (value) {
+                            if (value != null &&
+                                value.isNotEmpty &&
+                                value.length < 6) {
+                              return 'Password must be at least 6 characters';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Confirm password field
+                        _buildEnhancedTextField(
+                          controller: _confirmPasswordController,
+                          label: 'Confirm New Password',
+                          icon: Icons.lock_outline_rounded,
+                          isPassword: true,
+                          obscureText: _obscureConfirmPassword,
+                          onToggleVisibility: () {
+                            setState(() {
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword;
+                            });
+                          },
+                          validator: (value) {
+                            if (_newPasswordController.text.isNotEmpty &&
+                                value != _newPasswordController.text) {
+                              return 'Passwords do not match';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Compact Action Buttons
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: OutlinedButton(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () => Navigator.of(context).pop(),
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide.none,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Cancel',
+                                    style: AppTextStyles.body2.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Container(
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppColors.primary,
+                                      AppColors.primary.withOpacity(0.8),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primary.withOpacity(0.3),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: ElevatedButton(
+                                  onPressed: _isLoading ? null : _updateProfile,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    shadowColor: Colors.transparent,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          height: 18,
+                                          width: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Colors.white,
+                                                ),
+                                          ),
+                                        )
+                                      : Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            const Icon(
+                                              Icons.save_rounded,
+                                              color: Colors.white,
+                                              size: 18,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'Save',
+                                              style: AppTextStyles.body2
+                                                  .copyWith(
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.white,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build section header with icon
+  Widget _buildSectionHeader(
+    String title,
+    IconData icon, {
+    bool isOptional = false,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: AppColors.primary, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: AppTextStyles.heading3.copyWith(
+            fontWeight: FontWeight.bold,
+            color: Colors.grey.shade800,
+          ),
+        ),
+        if (isOptional) ...[
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              'Optional',
+              style: AppTextStyles.caption.copyWith(
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Build barangay dropdown
+  Widget _buildBarangayDropdown() {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: DropdownButtonFormField<String>(
+        value: _selectedBarangay,
+        decoration: InputDecoration(
+          labelText: 'Barangay',
+          labelStyle: AppTextStyles.body2.copyWith(color: Colors.grey.shade600),
+          prefixIcon: Container(
+            margin: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.location_city_rounded,
+              color: AppColors.primary,
+              size: 20,
+            ),
+          ),
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.primary, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 12,
+          ),
+        ),
+        items: _barangays.map((String barangay) {
+          return DropdownMenuItem<String>(
+            value: barangay,
+            child: Text(
+              barangay,
+              style: AppTextStyles.body1.copyWith(color: Colors.grey.shade800),
+            ),
+          );
+        }).toList(),
+        onChanged: (String? newValue) {
+          setState(() {
+            _selectedBarangay = newValue;
+          });
+        },
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please select your barangay';
+          }
+          return null;
+        },
+        dropdownColor: Colors.white,
+        icon: Icon(
+          Icons.keyboard_arrow_down_rounded,
+          color: Colors.grey.shade600,
+        ),
+      ),
+    );
+  }
+
+  /// Build enhanced text field with modern styling
+  Widget _buildEnhancedTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? Function(String?)? validator,
+    bool isPassword = false,
+    bool obscureText = false,
+    VoidCallback? onToggleVisibility,
+    int maxLines = 1,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextFormField(
+        controller: controller,
+        obscureText: obscureText,
+        maxLines: maxLines,
+        validator: validator,
+        style: AppTextStyles.body1.copyWith(color: Colors.grey.shade800),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: AppTextStyles.body2.copyWith(color: Colors.grey.shade600),
+          prefixIcon: Container(
+            margin: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 20),
+          ),
+          suffixIcon: isPassword && onToggleVisibility != null
+              ? IconButton(
+                  icon: Icon(
+                    obscureText
+                        ? Icons.visibility_off_rounded
+                        : Icons.visibility_rounded,
+                    color: Colors.grey.shade600,
+                  ),
+                  onPressed: onToggleVisibility,
+                )
+              : null,
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.primary, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _updateProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final currentUser = widget.currentUser;
+      if (currentUser == null) {
+        throw Exception('No user found');
+      }
+
+      // Update profile data
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.id)
+          .update({
+            'name': _nameController.text.trim(),
+            'barangay': _selectedBarangay,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+      // Update password if provided
+      if (_newPasswordController.text.isNotEmpty) {
+        await FirebaseAuthService.updatePassword(
+          _currentPasswordController.text,
+          _newPasswordController.text,
+        );
+      }
+
+      // Force refresh user data in FirebaseAuthService to update cached data
+      await FirebaseAuthService.forceRefreshUserData();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop();
+        widget.onProfileUpdated();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating profile: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 }

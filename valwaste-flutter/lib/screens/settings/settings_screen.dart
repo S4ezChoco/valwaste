@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/constants.dart';
 import '../../services/firebase_auth_service.dart';
+import '../../services/location_service.dart';
 import '../../models/user.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _gpsTrackingEnabled = true;
   bool _notificationsEnabled = true;
+  bool _realtimeLocationSharing = true;
   bool _isLoading = true;
   UserModel? _currentUser;
 
@@ -31,6 +33,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       // Load notification setting
       _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+
+      // Load real-time location sharing setting
+      _realtimeLocationSharing =
+          await LocationService.isRealtimeLocationSharingEnabled();
 
       // Load current user
       _currentUser = FirebaseAuthService.currentUser;
@@ -103,6 +109,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       print('Error updating notification setting: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating setting: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateRealtimeLocationSharingSetting(bool value) async {
+    try {
+      if (value) {
+        await LocationService.enableRealtimeLocationSharing();
+      } else {
+        await LocationService.disableRealtimeLocationSharing();
+      }
+
+      setState(() {
+        _realtimeLocationSharing = value;
+      });
+
+      // Show confirmation message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              value
+                  ? 'Real-time location sharing enabled. Your location will be visible to other users on the map.'
+                  : 'Real-time location sharing disabled. Your location will not be visible to other users.',
+            ),
+            backgroundColor: value ? Colors.green : Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error updating real-time location sharing setting: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -207,146 +252,300 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                     // GPS Tracking Setting - Only for drivers
                     Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(
-                        AppSizes.radiusMedium,
-                      ),
-                      border: Border.all(color: AppColors.border),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 5,
-                          offset: const Offset(0, 2),
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSizes.paddingMedium),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(
+                          AppSizes.radiusMedium,
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: _gpsTrackingEnabled
-                                    ? Colors.green.withOpacity(0.1)
-                                    : Colors.red.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(
-                                  AppSizes.radiusSmall,
-                                ),
-                              ),
-                              child: Icon(
-                                _gpsTrackingEnabled
-                                    ? Icons.location_on
-                                    : Icons.location_off,
-                                color: _gpsTrackingEnabled
-                                    ? Colors.green
-                                    : Colors.red,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: AppSizes.paddingMedium),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'GPS Location Tracking',
-                                    style: AppTextStyles.body1.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _gpsTrackingEnabled
-                                        ? 'Location is being shared for better service'
-                                        : 'Location sharing is disabled',
-                                    style: AppTextStyles.body2.copyWith(
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Switch(
-                              value: _gpsTrackingEnabled,
-                              onChanged: _updateGpsTrackingSetting,
-                              activeColor: Colors.green,
-                              inactiveThumbColor: Colors.red,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSizes.paddingMedium),
-
-                        // GPS Status Info
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(AppSizes.paddingMedium),
-                          decoration: BoxDecoration(
-                            color: _gpsTrackingEnabled
-                                ? Colors.green.withOpacity(0.05)
-                                : Colors.red.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(
-                              AppSizes.radiusSmall,
-                            ),
-                            border: Border.all(
-                              color: _gpsTrackingEnabled
-                                  ? Colors.green.withOpacity(0.2)
-                                  : Colors.red.withOpacity(0.2),
-                            ),
+                        border: Border.all(color: AppColors.border),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 5,
+                            offset: const Offset(0, 2),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    _gpsTrackingEnabled
-                                        ? Icons.info
-                                        : Icons.warning,
-                                    color: _gpsTrackingEnabled
-                                        ? Colors.green
-                                        : Colors.red,
-                                    size: 16,
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: _gpsTrackingEnabled
+                                      ? Colors.green.withOpacity(0.1)
+                                      : Colors.red.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(
+                                    AppSizes.radiusSmall,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    _gpsTrackingEnabled
-                                        ? 'GPS Tracking Enabled'
-                                        : 'GPS Tracking Disabled',
-                                    style: AppTextStyles.body2.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: _gpsTrackingEnabled
-                                          ? Colors.green
-                                          : Colors.red,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _gpsTrackingEnabled
-                                    ? '• Your location will be used for route optimization\n• Collection requests will include your coordinates\n• Drivers can navigate to your exact location\n• Better service and faster collection times'
-                                    : '• Your location will NOT be shared\n• You must manually enter your address\n• Route optimization may be less efficient\n• Collection may take longer',
-                                style: AppTextStyles.body2.copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12,
                                 ),
+                                child: Icon(
+                                  _gpsTrackingEnabled
+                                      ? Icons.location_on
+                                      : Icons.location_off,
+                                  color: _gpsTrackingEnabled
+                                      ? Colors.green
+                                      : Colors.red,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: AppSizes.paddingMedium),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'GPS Location Tracking',
+                                      style: AppTextStyles.body1.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _gpsTrackingEnabled
+                                          ? 'Location is being shared for better service'
+                                          : 'Location sharing is disabled',
+                                      style: AppTextStyles.body2.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: _gpsTrackingEnabled,
+                                onChanged: _updateGpsTrackingSetting,
+                                activeColor: Colors.green,
+                                inactiveThumbColor: Colors.red,
                               ),
                             ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: AppSizes.paddingMedium),
+
+                          // GPS Status Info
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(
+                              AppSizes.paddingMedium,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _gpsTrackingEnabled
+                                  ? Colors.green.withOpacity(0.05)
+                                  : Colors.red.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(
+                                AppSizes.radiusSmall,
+                              ),
+                              border: Border.all(
+                                color: _gpsTrackingEnabled
+                                    ? Colors.green.withOpacity(0.2)
+                                    : Colors.red.withOpacity(0.2),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _gpsTrackingEnabled
+                                          ? Icons.info
+                                          : Icons.warning,
+                                      color: _gpsTrackingEnabled
+                                          ? Colors.green
+                                          : Colors.red,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _gpsTrackingEnabled
+                                          ? 'GPS Tracking Enabled'
+                                          : 'GPS Tracking Disabled',
+                                      style: AppTextStyles.body2.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: _gpsTrackingEnabled
+                                            ? Colors.green
+                                            : Colors.red,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _gpsTrackingEnabled
+                                      ? '• Your location will be used for route optimization\n• Collection requests will include your coordinates\n• Drivers can navigate to your exact location\n• Better service and faster collection times'
+                                      : '• Your location will NOT be shared\n• You must manually enter your address\n• Route optimization may be less efficient\n• Collection may take longer',
+                                  style: AppTextStyles.body2.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
 
                     const SizedBox(height: AppSizes.paddingLarge),
                   ], // End of driver-only GPS settings
+                  // Real-time Location Sharing Settings - For residents
+                  if (_currentUser?.role == UserRole.resident) ...[
+                    Text(
+                      'Location Sharing',
+                      style: AppTextStyles.heading3.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: AppSizes.paddingMedium),
 
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSizes.paddingMedium),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(
+                          AppSizes.radiusMedium,
+                        ),
+                        border: Border.all(color: AppColors.border),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 5,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: _realtimeLocationSharing
+                                      ? Colors.blue.withOpacity(0.1)
+                                      : Colors.grey.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(
+                                    AppSizes.radiusSmall,
+                                  ),
+                                ),
+                                child: Icon(
+                                  _realtimeLocationSharing
+                                      ? Icons.people
+                                      : Icons.people_outline,
+                                  color: _realtimeLocationSharing
+                                      ? Colors.blue
+                                      : Colors.grey,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: AppSizes.paddingMedium),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Real-time Location Sharing',
+                                      style: AppTextStyles.body1.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _realtimeLocationSharing
+                                          ? 'Your location is visible to other users on the map'
+                                          : 'Your location is private and not shared',
+                                      style: AppTextStyles.body2.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: _realtimeLocationSharing,
+                                onChanged:
+                                    _updateRealtimeLocationSharingSetting,
+                                activeColor: Colors.blue,
+                                inactiveThumbColor: Colors.grey,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSizes.paddingMedium),
+
+                          // Location Sharing Status Info
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(
+                              AppSizes.paddingMedium,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _realtimeLocationSharing
+                                  ? Colors.blue.withOpacity(0.05)
+                                  : Colors.grey.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(
+                                AppSizes.radiusSmall,
+                              ),
+                              border: Border.all(
+                                color: _realtimeLocationSharing
+                                    ? Colors.blue.withOpacity(0.2)
+                                    : Colors.grey.withOpacity(0.2),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _realtimeLocationSharing
+                                          ? Icons.info
+                                          : Icons.visibility_off,
+                                      color: _realtimeLocationSharing
+                                          ? Colors.blue
+                                          : Colors.grey,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _realtimeLocationSharing
+                                          ? 'Location Sharing Enabled'
+                                          : 'Location Sharing Disabled',
+                                      style: AppTextStyles.body2.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: _realtimeLocationSharing
+                                            ? Colors.blue
+                                            : Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _realtimeLocationSharing
+                                      ? '• Your location appears as a blue marker on the map\n• Other residents and drivers can see your location\n• Helps with better coordination and service\n• Your location updates every 10 seconds'
+                                      : '• Your location is private and not visible to others\n• You can still make collection requests\n• Location will only be shared when making requests\n• Better privacy protection',
+                                  style: AppTextStyles.body2.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSizes.paddingLarge),
+                  ], // End of resident-only location sharing settings
                   // Notification Settings
                   Text(
                     'Notifications',

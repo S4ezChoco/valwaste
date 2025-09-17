@@ -551,22 +551,20 @@ function resetForm() {
         approvedRequestSelect.selectedIndex = 0;
     }
     
-    // Clear street markers
+    // Clear street markers (no longer used)
     if (window.streetMarkers) {
-        streetMarkers.forEach(m => m.marker.remove());
         streetMarkers = [];
     }
     
-    // Clear any barangay markers
+    // Clear any barangay markers (no longer used)
     if (window.barangayMarker) {
-        window.barangayMarker.remove();
         window.barangayMarker = null;
     }
     
     // Reset coordinates display
     const coordsDisplay = document.getElementById('coordinates-display');
     if (coordsDisplay) {
-        coordsDisplay.innerHTML = 'Click on the map to select a location';
+        coordsDisplay.innerHTML = 'Select an approved request to see the resident location on the map';
     }
     
     // Clear street checklist
@@ -666,8 +664,7 @@ function selectDriver(driverId, driverName, driverData) {
         // selectedCollectors = selectedCollectors.filter(c => c.barangay === driverData.barangay);
         updateCollectorsDisplay();
         
-        // Pin the barangay on the map (but don't replace street checklist)
-        pinDriverBarangayOnMap(driverData.barangay);
+        // No longer pin barangay on map - only approved requests show pins
         
         // Show notification
         if (window.showInfo) {
@@ -733,16 +730,6 @@ function initLocationMap() {
     const parentContainer = mapContainer.closest('.location-map-container');
     if (parentContainer) {
         parentContainer.style.display = 'flex';
-    }
-    
-    // Clean up existing map
-    if (scheduleMap) {
-        try {
-            scheduleMap.remove();
-        } catch (e) {
-            console.log('Error removing existing map:', e);
-        }
-        scheduleMap = null;
     }
     
     if (window.locationMarker) {
@@ -856,8 +843,6 @@ function initLocationMap() {
                     }
                 });
             });
-            
-            // Remove click handler for location selection - now using street checklist only
             
             // Handle map errors
             scheduleMap.on('error', function(e) {
@@ -1028,85 +1013,7 @@ function loadNearbyStreets(lat, lng) {
 let streetMarkers = [];
 let barangayMarker = null;
 
-// Function to pin barangay on map (preserves existing street checklist)
-function pinDriverBarangayOnMap(barangayName) {
-    if (!scheduleMap) return;
-    
-    // Get barangay coordinates
-    const barangayData = getBarangayCoordinates(barangayName);
-    if (!barangayData) {
-        console.log('No coordinates found for barangay:', barangayName);
-        return;
-    }
-    
-    // Remove existing barangay marker if any
-    if (window.barangayMarker) {
-        window.barangayMarker.remove();
-        window.barangayMarker = null;
-    }
-    
-    // Add new marker for barangay
-    window.barangayMarker = new maplibregl.Marker({
-        color: '#3b82f6' // Blue color for barangay center
-    })
-        .setLngLat(barangayData.coordinates)
-        .addTo(scheduleMap);
-    
-    // Center map on barangay only if no streets are currently selected
-    if (streetMarkers.length === 0) {
-        scheduleMap.flyTo({
-            center: barangayData.coordinates,
-            zoom: 13,
-            duration: 1000
-        });
-    }
-    
-    // Don't touch the street checklist - preserve user's selections
-}
-
-// Function to pin barangay on map (for initial street loading)
-function pinBarangayOnMap(barangayName) {
-    if (!scheduleMap) return;
-    
-    // Get barangay coordinates
-    const barangayData = getBarangayCoordinates(barangayName);
-    if (!barangayData) {
-        console.log('No coordinates found for barangay:', barangayName);
-        return;
-    }
-    
-    // Remove existing barangay marker if any
-    if (window.barangayMarker) {
-        window.barangayMarker.remove();
-        window.barangayMarker = null;
-    }
-    
-    // Add new marker for barangay
-    window.barangayMarker = new maplibregl.Marker({
-        color: '#3b82f6' // Blue color for barangay center
-    })
-        .setLngLat(barangayData.coordinates)
-        .addTo(scheduleMap);
-    
-    // Center map on barangay
-    scheduleMap.flyTo({
-        center: barangayData.coordinates,
-        zoom: 13,
-        duration: 1000
-    });
-    
-    // Load streets for this barangay in the checklist (only for initial loading)
-    const streetsData = getAllValenzuelaStreets();
-    if (streetsData[barangayName]) {
-        const barangayStreets = streetsData[barangayName].streets.map(street => ({
-            display: `${barangayName} Area`,
-            street: street,
-            barangay: barangayName,
-            coordinates: barangayData.coordinates
-        }));
-        displayStreetsChecklist(barangayStreets);
-    }
-}
+// Pin functions removed - no longer using map pins
 
 // Get barangay coordinates
 function getBarangayCoordinates(barangayName) {
@@ -1181,25 +1088,8 @@ function displayStreetsChecklist(streets) {
 }
 
 function handleStreetSelection(streetObj, isChecked) {
-    if (!scheduleMap) return;
-    
+    // Removed map pin functionality - streets are now just for reference
     if (isChecked) {
-        // Add marker to map
-        const marker = new maplibregl.Marker({
-            color: '#22c55e' // Green color for selected streets
-        })
-            .setLngLat(streetObj.coordinates)
-            .addTo(scheduleMap);
-        
-        // Store marker with street info
-        streetMarkers.push({
-            marker: marker,
-            streetData: streetObj
-        });
-        
-        // Update coordinates display
-        updateCoordinatesDisplay();
-        
         // Apply barangay filter based on selected street
         const streetBarangay = streetObj.barangay || extractBarangayFromStreet(streetObj.display);
         
@@ -1225,38 +1115,14 @@ function handleStreetSelection(streetObj, isChecked) {
             // Show notification
             showInfo(`Filtered to ${streetBarangay} barangay`);
         }
-        
-        // Center map on the selected area if it's the first selection
-        if (streetMarkers.length === 1) {
-            scheduleMap.flyTo({
-                center: streetObj.coordinates,
-                zoom: 14,
-                duration: 1000
-            });
-        }
     } else {
-        // Remove marker from map
-        const markerIndex = streetMarkers.findIndex(m => 
-            m.streetData.display === streetObj.display
-        );
-        
-        if (markerIndex !== -1) {
-            streetMarkers[markerIndex].marker.remove();
-            streetMarkers.splice(markerIndex, 1);
-        }
-        
-        // Update coordinates display
-        updateCoordinatesDisplay();
-        
         // If no more streets are selected, clear the barangay filter
-        if (streetMarkers.length === 0) {
-            currentBarangayFilter = null;
-            renderDrivers();
-            renderCollectors();
-            
-            // Show notification
-            showInfo('Filter cleared - showing all personnel');
-        }
+        currentBarangayFilter = null;
+        renderDrivers();
+        renderCollectors();
+        
+        // Show notification
+        showInfo('Filter cleared - showing all personnel');
     }
 }
 
@@ -1264,33 +1130,28 @@ function updateCoordinatesDisplay() {
     const coordsDisplay = document.getElementById('coordinates-display');
     if (!coordsDisplay) return;
     
-    if (streetMarkers.length === 0) {
-        coordsDisplay.innerHTML = 'Select streets from the checklist to pin locations on the map';
+    // Check if we have an approved request location
+    const approvedRequestSelect = document.getElementById('approved-request-select');
+    if (approvedRequestSelect && approvedRequestSelect.value) {
+        // We have an approved request selected, location should be set from that
+        return; // Don't override the approved request location display
+    }
+    
+    // Get selected streets from checkboxes
+    const selectedStreets = document.querySelectorAll('input[name="selected-streets"]:checked');
+    
+    if (selectedStreets.length === 0) {
+        coordsDisplay.innerHTML = 'Select an approved request to see the resident location on the map';
         selectedLocation = null;
-    } else if (streetMarkers.length === 1) {
-        const coords = streetMarkers[0].streetData.coordinates;
-        coordsDisplay.innerHTML = `
-            <strong>Selected Location:</strong><br>
-            ${streetMarkers[0].streetData.barangay}, ${streetMarkers[0].streetData.district}<br>
-            Latitude: ${coords[1].toFixed(6)}, Longitude: ${coords[0].toFixed(6)}
-        `;
-        selectedLocation = {
-            lng: coords[0],
-            lat: coords[1]
-        };
     } else {
-        // Calculate center point of all selected streets
-        const avgLng = streetMarkers.reduce((sum, m) => sum + m.streetData.coordinates[0], 0) / streetMarkers.length;
-        const avgLat = streetMarkers.reduce((sum, m) => sum + m.streetData.coordinates[1], 0) / streetMarkers.length;
-        
         coordsDisplay.innerHTML = `
-            <strong>Selected Locations:</strong><br>
-            ${streetMarkers.length} streets selected<br>
-            Center: ${avgLat.toFixed(6)}, ${avgLng.toFixed(6)}
+            <strong>Selected Streets:</strong><br>
+            ${selectedStreets.length} street(s) selected for this schedule
         `;
+        // Set a default location for validation (Valenzuela center)
         selectedLocation = {
-            lng: avgLng,
-            lat: avgLat
+            lng: 120.9455,
+            lat: 14.7077
         };
     }
 }
@@ -1463,7 +1324,7 @@ function openCreateModal() {
     // Update UI
     document.getElementById('driver-selected-text').textContent = 'Select driver';
     document.getElementById('collectors-selected-text').textContent = 'Select waste collectors';
-    document.getElementById('coordinates-display').innerHTML = 'Select streets from the checklist to pin locations on the map';
+    document.getElementById('coordinates-display').innerHTML = 'Select an approved request to see the resident location on the map';
     
     // Show all streets immediately
     displayStreetsChecklist(getStreetsArray());
@@ -1504,7 +1365,7 @@ function resetForm() {
     
     document.getElementById('driver-selected-text').textContent = 'Select driver';
     document.getElementById('collectors-selected-text').textContent = 'Select waste collectors';
-    document.getElementById('coordinates-display').innerHTML = 'Select streets from the checklist to pin locations on the map';
+    document.getElementById('coordinates-display').innerHTML = 'Select an approved request to see the resident location on the map';
     document.getElementById('streets-checklist').innerHTML = '';
     
     const searchInput = document.getElementById('street-search');
@@ -1512,15 +1373,11 @@ function resetForm() {
         searchInput.value = '';
     }
     
-    // Clear all street markers
-    streetMarkers.forEach(markerObj => {
-        markerObj.marker.remove();
-    });
+    // Clear all street markers (no longer used)
     streetMarkers = [];
     
-    // Clear old location marker if it exists
+    // Clear old location marker if it exists (no longer used)
     if (window.locationMarker) {
-        window.locationMarker.remove();
         window.locationMarker = null;
     }
 }
@@ -2084,7 +1941,7 @@ async function loadApprovedRequestDetails() {
                 `;
             }
             
-            // Wait for map to be fully loaded before adding marker
+            // Add pin to map for approved request location
             const addMarkerToMap = () => {
                 if (scheduleMap && scheduleMap.isStyleLoaded && scheduleMap.isStyleLoaded()) {
                     // Clear existing markers
@@ -2158,10 +2015,7 @@ async function loadApprovedRequestDetails() {
                         zoom: 15
                     });
                     
-                    // Update coordinates display
-                    updateCoordinatesDisplay();
-                    
-                    console.log('Added resident location marker to map (MapLibre GL)');
+                    console.log('Added resident location marker to map for approved request');
                 } else {
                     console.log('Map not ready, retrying in 500ms...');
                     setTimeout(addMarkerToMap, 500);
@@ -2183,9 +2037,6 @@ async function loadApprovedRequestDetails() {
                 };
                 waitForMap();
             }
-            
-            // Auto-check the corresponding street in the checklist
-            autoCheckStreetFromCoordinates(collectionData.latitude, collectionData.longitude, collectionData.address);
         } else {
             // If no coordinates, still show the address
             const coordinatesDisplay = document.getElementById('coordinates-display');
@@ -2216,177 +2067,9 @@ async function loadApprovedRequestDetails() {
     }
 }
 
-// Auto-check street from coordinates
-function autoCheckStreetFromCoordinates(lat, lng, address) {
-    try {
-        console.log('Auto-checking street for coordinates:', lat, lng, address);
-        
-        // First, add or update the "Resident Location" option
-        addResidentLocationOption(lat, lng, address);
-        
-        // Get all street checkboxes
-        const streetCheckboxes = document.querySelectorAll('input[name="selected-streets"]');
-        
-        // Try to find matching street based on address or coordinates
-        for (const checkbox of streetCheckboxes) {
-            const streetName = checkbox.value;
-            const streetData = checkbox.dataset.streetData;
-            
-            if (streetData) {
-                try {
-                    const street = JSON.parse(streetData);
-                    
-                    // Check if coordinates are close to this street
-                    if (street.lat && street.lng) {
-                        const distance = calculateDistance(lat, lng, street.lat, street.lng);
-                        
-                        // If within 100 meters, auto-check this street
-                        if (distance < 0.1) {
-                            checkbox.checked = true;
-                            console.log('Auto-checked street:', streetName, 'Distance:', distance);
-                            
-                            // Trigger the change event to update the map
-                            checkbox.dispatchEvent(new Event('change'));
-                            break;
-                        }
-                    }
-                    
-                    // Also check if address contains street name
-                    if (address && address.toLowerCase().includes(streetName.toLowerCase())) {
-                        checkbox.checked = true;
-                        console.log('Auto-checked street by address match:', streetName);
-                        
-                        // Trigger the change event to update the map
-                        checkbox.dispatchEvent(new Event('change'));
-                        break;
-                    }
-                } catch (parseError) {
-                    console.log('Error parsing street data:', parseError);
-                }
-            }
-        }
-        
-        // Auto-check the "Resident Location" option
-        const residentLocationCheckbox = document.querySelector('input[name="selected-streets"][value="Resident Location"]');
-        if (residentLocationCheckbox) {
-            residentLocationCheckbox.checked = true;
-            console.log('Auto-checked Resident Location');
-            
-            // Set selectedLocation for validation
-            selectedLocation = {
-                lat: lat,
-                lng: lng,
-                address: address || 'Selected location'
-            };
-            console.log('Set selectedLocation for validation:', selectedLocation);
-            
-            // Trigger the change event to update the map
-            residentLocationCheckbox.dispatchEvent(new Event('change'));
-            
-            // Also add pin to map using the same logic as the MapLibre GL marker
-            setTimeout(() => {
-                const streetData = JSON.parse(residentLocationCheckbox.dataset.streetData);
-                if (streetData && streetData.lat && streetData.lng && scheduleMap && scheduleMap.isStyleLoaded && scheduleMap.isStyleLoaded()) {
-                    // Add street marker to map (same as resident location marker)
-                    if (scheduleMap.getSource('street-location')) {
-                        scheduleMap.removeSource('street-location');
-                    }
-                    if (scheduleMap.getLayer('street-location-marker')) {
-                        scheduleMap.removeLayer('street-location-marker');
-                    }
-                    
-                    scheduleMap.addSource('street-location', {
-                        type: 'geojson',
-                        data: {
-                            type: 'Feature',
-                            geometry: {
-                                type: 'Point',
-                                coordinates: [streetData.lng, streetData.lat]
-                            },
-                            properties: {
-                                title: 'Resident Location',
-                                address: streetData.address || 'Selected location'
-                            }
-                        }
-                    });
-                    
-                    scheduleMap.addLayer({
-                        id: 'street-location-marker',
-                        type: 'circle',
-                        source: 'street-location',
-                        paint: {
-                            'circle-radius': 12,
-                            'circle-color': '#0ea5e9',
-                            'circle-stroke-width': 3,
-                            'circle-stroke-color': '#ffffff',
-                            'circle-opacity': 0.8
-                        }
-                    });
-                    
-                    console.log('Added resident location pin to map via street selection');
-                }
-            }, 100);
-        }
-        
-    } catch (error) {
-        console.error('Error auto-checking street:', error);
-    }
-}
+// Auto-check street functionality removed - no longer using map pins
 
-// Add or update the "Resident Location" option in the checklist
-function addResidentLocationOption(lat, lng, address) {
-    try {
-        const streetsChecklist = document.getElementById('streets-checklist');
-        if (!streetsChecklist) return;
-        
-        // Check if "Resident Location" already exists
-        let residentLocationItem = document.querySelector('.street-item[data-street="Resident Location"]');
-        
-        if (!residentLocationItem) {
-            // Create new resident location item
-            residentLocationItem = document.createElement('div');
-            residentLocationItem.className = 'street-item';
-            residentLocationItem.setAttribute('data-street', 'Resident Location');
-            
-            residentLocationItem.innerHTML = `
-                <label class="street-checkbox">
-                    <input type="checkbox" name="selected-streets" value="Resident Location" 
-                           data-street-data='{"lat": ${lat}, "lng": ${lng}, "name": "Resident Location", "address": "${address || 'Selected location'}"}'>
-                    <span class="checkmark"></span>
-                    <span class="street-name">Resident Location</span>
-                    <span class="street-address">${address || 'Selected location'}</span>
-                </label>
-            `;
-            
-            // Add it at the top of the checklist
-            streetsChecklist.insertBefore(residentLocationItem, streetsChecklist.firstChild);
-            
-            console.log('Added Resident Location to checklist');
-        } else {
-            // Update existing resident location with new coordinates
-            const checkbox = residentLocationItem.querySelector('input[name="selected-streets"]');
-            const addressSpan = residentLocationItem.querySelector('.street-address');
-            
-            if (checkbox) {
-                checkbox.dataset.streetData = JSON.stringify({
-                    lat: lat,
-                    lng: lng,
-                    name: "Resident Location",
-                    address: address || 'Selected location'
-                });
-            }
-            
-            if (addressSpan) {
-                addressSpan.textContent = address || 'Selected location';
-            }
-            
-            console.log('Updated Resident Location in checklist');
-        }
-        
-    } catch (error) {
-        console.error('Error adding resident location option:', error);
-    }
-}
+// Resident location option functionality removed - no longer using map pins
 
 // Calculate distance between two coordinates (in kilometers)
 function calculateDistance(lat1, lng1, lat2, lng2) {

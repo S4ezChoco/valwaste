@@ -5,6 +5,7 @@ import '../utils/barangay_data.dart';
 
 class LocationService {
   static const String _gpsTrackingKey = 'gps_tracking_enabled';
+  static const String _realtimeLocationSharingKey = 'realtime_location_sharing';
 
   /// Check if GPS tracking is enabled in user settings
   static Future<bool> isGpsTrackingEnabled() async {
@@ -171,6 +172,40 @@ class LocationService {
     }
   }
 
+  /// Check if real-time location sharing is enabled
+  static Future<bool> isRealtimeLocationSharingEnabled() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_realtimeLocationSharingKey) ??
+          true; // Default to enabled
+    } catch (e) {
+      print('Error checking real-time location sharing setting: $e');
+      return true; // Default to enabled if error
+    }
+  }
+
+  /// Enable real-time location sharing
+  static Future<void> enableRealtimeLocationSharing() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_realtimeLocationSharingKey, true);
+      print('Real-time location sharing enabled');
+    } catch (e) {
+      print('Error enabling real-time location sharing: $e');
+    }
+  }
+
+  /// Disable real-time location sharing
+  static Future<void> disableRealtimeLocationSharing() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_realtimeLocationSharingKey, false);
+      print('Real-time location sharing disabled');
+    } catch (e) {
+      print('Error disabling real-time location sharing: $e');
+    }
+  }
+
   /// Get formatted location string for display
   static Future<String> getFormattedLocationString() async {
     try {
@@ -180,8 +215,8 @@ class LocationService {
       }
 
       return BarangayData.getNearestBarangay(
-        coordinates['latitude']!, 
-        coordinates['longitude']!
+        coordinates['latitude']!,
+        coordinates['longitude']!,
       );
     } catch (e) {
       return 'Error getting location: $e';

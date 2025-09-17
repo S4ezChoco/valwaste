@@ -560,7 +560,7 @@
                         <div id="location-map"></div>
                     </div>
                     <div class="coordinates-display" id="coordinates-display">
-                        Click on the map to select a location
+                        Select an approved request to see the resident location on the map
                     </div>
                 </div>
 

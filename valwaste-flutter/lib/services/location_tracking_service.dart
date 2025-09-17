@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'firebase_auth_service.dart';
+import 'location_service.dart';
 import '../models/user.dart';
 
 class LocationTrackingService {
@@ -91,24 +92,41 @@ class LocationTrackingService {
         'lastUpdated': DateTime.now().toIso8601String(),
       };
 
-      // Update user document with location
+      // Update user document with location (both nested and direct fields for compatibility)
       await _firestore.collection('users').doc(currentUser.id).update({
         'location': locationData,
+        'latitude': position.latitude, // Direct field for map compatibility
+        'longitude': position.longitude, // Direct field for map compatibility
         'lastLocationUpdate': FieldValue.serverTimestamp(),
       });
 
-      // Also store in a separate locations collection for real-time tracking
-      await _firestore.collection('user_locations').doc(currentUser.id).set({
-        'userId': currentUser.id,
-        'userEmail': currentUser.email,
-        'userName': currentUser.name,
-        'userRole': currentUser.roleString,
-        'barangay': currentUser.barangay,
-        'address': currentUser.address, // Add address field
-        'location': locationData,
-        'isOnline': true,
-        'lastSeen': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      // Check if real-time location sharing is enabled for residents
+      bool shouldShareLocation = true;
+      if (currentUser.role == UserRole.resident) {
+        shouldShareLocation =
+            await LocationService.isRealtimeLocationSharingEnabled();
+      }
+
+      // Store in real-time tracking collection only if sharing is enabled
+      if (shouldShareLocation) {
+        await _firestore.collection('user_locations').doc(currentUser.id).set({
+          'userId': currentUser.id,
+          'userEmail': currentUser.email,
+          'userName': currentUser.name,
+          'userRole': currentUser.roleString,
+          'barangay': currentUser.barangay,
+          'address': currentUser.address, // Add address field
+          'location': locationData,
+          'isOnline': true,
+          'lastSeen': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } else {
+        // Remove from real-time tracking if sharing is disabled
+        await _firestore
+            .collection('user_locations')
+            .doc(currentUser.id)
+            .delete();
+      }
 
       print(
         'Location updated for ${currentUser.email}: ${position.latitude}, ${position.longitude}',
