@@ -63,6 +63,13 @@ class _MapScreenState extends State<MapScreen>
   bool _showAnnouncementCard = false;
   bool _announcementManuallyDismissed = false;
 
+  // Driver info card collapse state
+  bool _isDriverCardCollapsed = false;
+
+  // Map tile loading optimization
+  Timer? _mapUpdateTimer;
+  bool _isMapUpdating = false;
+
   // Keep map state alive when switching tabs
   @override
   bool get wantKeepAlive => true;
@@ -411,7 +418,13 @@ class _MapScreenState extends State<MapScreen>
                     TileLayer(
                       urlTemplate: _getTileUrl(),
                       userAgentPackageName: 'com.example.valwaste',
-                      maxZoom: 19,
+                      maxZoom: 18, // Reduced to prevent tile loading issues
+                      minZoom: 10, // Prevent zooming out too far
+                      subdomains: _isSatelliteView || _showTraffic ? ['0', '1', '2', '3'] : const [],
+                      additionalOptions: const {
+                        'tileSize': '256',
+                      },
+                      tileProvider: NetworkTileProvider(),
                     ),
                     // Current location marker
                     if (_currentLocation != null)
@@ -479,98 +492,6 @@ class _MapScreenState extends State<MapScreen>
                           ),
                         ],
                       ),
-                      // Debug: Show driver location info
-                      if (FirebaseAuthService.currentUser?.role ==
-                          UserRole.resident)
-                        Positioned(
-                          top: 100,
-                          right: 10,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Driver Location:',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  BarangayData.getNearestBarangay(
-                                    _driverLocation!.latitude,
-                                    _driverLocation!.longitude,
-                                  ),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.2,
-                                        ),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: const Text(
-                                        'TRACKING',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 8,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    GestureDetector(
-                                      onTap: () {
-                                        if (_assignedDriverInfo != null) {
-                                          final driverId =
-                                              _assignedDriverInfo!['id']
-                                                  as String?;
-                                          if (driverId != null) {
-                                            _getInitialDriverLocation(driverId);
-                                          }
-                                        }
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.2,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.refresh,
-                                          color: Colors.white,
-                                          size: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
                     ],
                     // Waste collection points
                     MarkerLayer(markers: _wasteCollectionPoints),
@@ -1065,7 +986,7 @@ class _MapScreenState extends State<MapScreen>
     }
   }
 
-  /// Start tracking driver location in real-time
+  /// Start tracking driver location in real-time with throttling
   void _startDriverLocationTracking(String driverId) {
     print('🔍 Setting up driver location tracking for: $driverId');
     _driverLocationSubscription?.cancel();
@@ -1076,7 +997,7 @@ class _MapScreenState extends State<MapScreen>
         .snapshots()
         .listen((snapshot) {
           print('🔍 Driver location snapshot received: ${snapshot.exists}');
-          if (snapshot.exists) {
+          if (snapshot.exists && !_isMapUpdating) {
             final data = snapshot.data()!;
             final latitude = data['latitude']?.toDouble();
             final longitude = data['longitude']?.toDouble();
@@ -1084,16 +1005,18 @@ class _MapScreenState extends State<MapScreen>
             print('🔍 Driver location update: lat=$latitude, lng=$longitude');
 
             if (latitude != null && longitude != null) {
-              setState(() {
-                _driverLocation = LatLng(latitude, longitude);
+              _throttleMapUpdate(() {
+                setState(() {
+                  _driverLocation = LatLng(latitude, longitude);
+                });
+
+                print('✅ Driver location set: $_driverLocation');
+
+                // Update estimated arrival when driver location changes
+                if (_assignedDriverInfo != null && _currentLocation != null) {
+                  _updateEstimatedArrival();
+                }
               });
-
-              print('✅ Driver location set: $_driverLocation');
-
-              // Update estimated arrival when driver location changes
-              if (_assignedDriverInfo != null && _currentLocation != null) {
-                _updateEstimatedArrival();
-              }
             } else {
               print(
                 '❌ Driver location data is null: lat=$latitude, lng=$longitude',
@@ -1101,6 +1024,19 @@ class _MapScreenState extends State<MapScreen>
             }
           }
         });
+  }
+
+  /// Throttle map updates to prevent grey tiles
+  void _throttleMapUpdate(VoidCallback callback) {
+    if (_isMapUpdating) return;
+    
+    _isMapUpdating = true;
+    _mapUpdateTimer?.cancel();
+    
+    _mapUpdateTimer = Timer(const Duration(milliseconds: 1000), () {
+      callback();
+      _isMapUpdating = false;
+    });
   }
 
   /// Calculate estimated arrival time based on distance
@@ -1457,209 +1393,340 @@ class _MapScreenState extends State<MapScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade100,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Icon(
-                    Icons.local_shipping,
-                    color: Colors.green.shade600,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Your Driver is Coming',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey.shade800,
-                        ),
-                      ),
-                      Text(
-                        'Collection in Progress',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.green.shade600,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Status indicator
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.green.shade200),
-                  ),
-                  child: Text(
-                    'ON THE WAY',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green.shade700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Driver Info
-            Row(
-              children: [
-                // Driver Avatar
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: Colors.blue.shade100,
-                  child: Text(
-                    driverInfo['name']?.substring(0, 1).toUpperCase() ?? 'D',
-                    style: TextStyle(
-                      color: Colors.blue.shade700,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Driver Details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        driverInfo['name'] ?? 'Unknown Driver',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade800,
-                        ),
-                      ),
-                      Text(
-                        'Driver ID: ${driverInfo['id']?.substring(0, 8) ?? 'N/A'}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Location Button
-                GestureDetector(
-                  onTap: () {
-                    _navigateToDriverLocation();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.location_on,
-                      color: Colors.blue.shade600,
-                      size: 16,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Vehicle Info
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
+            // Header with retractable arrow
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _isDriverCardCollapsed = !_isDriverCardCollapsed;
+                });
+              },
               child: Row(
                 children: [
-                  Icon(
-                    Icons.local_shipping,
-                    color: Colors.grey.shade600,
-                    size: 16,
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Icon(
+                      Icons.local_shipping,
+                      color: Colors.green.shade600,
+                      size: 20,
+                    ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          driverInfo['truckInfo'] ?? 'Truck Info N/A',
+                          'Your Driver is Coming',
                           style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                             color: Colors.grey.shade800,
                           ),
                         ),
                         Text(
-                          'Plate: ${driverInfo['plateNumber'] ?? 'N/A'}',
+                          'Collection in Progress',
                           style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                            color: Colors.green.shade600,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Collection Details
-            if (collection != null) ...[
-              Row(
-                children: [
-                  Icon(Icons.location_on, color: Colors.red.shade600, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
+                  // Status indicator
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
                     child: Text(
-                      BarangayData.formatLocationDisplay(collection.address),
+                      'ON THE WAY',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade700,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green.shade700,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Retractable arrow
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: AnimatedRotation(
+                      turns: _isDriverCardCollapsed ? -0.5 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        Icons.keyboard_arrow_up,
+                        color: Colors.grey.shade600,
+                        size: 20,
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    Icons.access_time,
-                    color: Colors.orange.shade600,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Estimated Arrival: ${driverInfo['estimatedArrival'] ?? 'Calculating...'}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                  ),
-                ],
+            ),
+            // Collapsible content with smooth animation
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              height: _isDriverCardCollapsed ? 0 : null,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 200),
+                opacity: _isDriverCardCollapsed ? 0.0 : 1.0,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    // Driver Info
+                    Row(
+                      children: [
+                        // Driver Avatar
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.blue.shade100,
+                          child: Text(
+                            driverInfo['name']?.substring(0, 1).toUpperCase() ?? 'D',
+                            style: TextStyle(
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Driver Details
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                driverInfo['name'] ?? 'Unknown Driver',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade800,
+                                ),
+                              ),
+                              Text(
+                                'Driver ID: ${driverInfo['id']?.substring(0, 8) ?? 'N/A'}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Location Button
+                        GestureDetector(
+                          onTap: () {
+                            _navigateToDriverLocation();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.location_on,
+                              color: Colors.blue.shade600,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Driver Location Info
+                    if (_driverLocation != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Icon(
+                                Icons.location_on,
+                                color: Colors.green.shade600,
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Driver Location',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.green.shade800,
+                                    ),
+                                  ),
+                                  Text(
+                                    BarangayData.getNearestBarangay(
+                                      _driverLocation!.latitude,
+                                      _driverLocation!.longitude,
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.green.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade600,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'TRACKING',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () {
+                                if (_assignedDriverInfo != null) {
+                                  final driverId = _assignedDriverInfo!['id'] as String?;
+                                  if (driverId != null) {
+                                    _getInitialDriverLocation(driverId);
+                                  }
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade100,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Icon(
+                                  Icons.refresh,
+                                  color: Colors.green.shade600,
+                                  size: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    // Vehicle Info
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.local_shipping,
+                            color: Colors.grey.shade600,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  driverInfo['truckInfo'] ?? 'Truck Info N/A',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey.shade800,
+                                  ),
+                                ),
+                                Text(
+                                  'Plate: ${driverInfo['plateNumber'] ?? 'N/A'}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Collection Details
+                    if (collection != null) ...[
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, color: Colors.red.shade600, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              BarangayData.formatLocationDisplay(collection.address),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade700,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.access_time,
+                            color: Colors.orange.shade600,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Estimated Arrival: ${driverInfo['estimatedArrival'] ?? 'Calculating...'}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ],
+            ),
           ],
         ),
       ),
@@ -2786,20 +2853,21 @@ class _MapScreenState extends State<MapScreen>
   }
 
   String _getTileUrl() {
+    // Use more reliable tile servers to prevent grey tiles
     if (_isSatelliteView) {
       if (_showTraffic) {
-        // Google Maps satellite with traffic layer
-        return 'https://mt1.google.com/vt/lyrs=y,traffic&x={x}&y={y}&z={z}';
+        // Google Maps satellite with traffic - use different server
+        return 'https://mt{s}.google.com/vt/lyrs=y,traffic&x={x}&y={y}&z={z}';
       } else {
-        // Google Maps satellite view
-        return 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+        // Google Maps satellite view - use different server
+        return 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
       }
     } else if (_showTraffic) {
-      // Google Maps with traffic layer
-      return 'https://mt1.google.com/vt/lyrs=m,traffic&x={x}&y={y}&z={z}';
+      // Google Maps with traffic layer - use different server
+      return 'https://mt{s}.google.com/vt/lyrs=m,traffic&x={x}&y={y}&z={z}';
     } else {
-      // Default to Google Maps
-      return 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+      // OpenStreetMap as fallback to prevent grey tiles
+      return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
     }
   }
 
@@ -3493,16 +3561,11 @@ class _MapScreenState extends State<MapScreen>
   @override
   void dispose() {
     try {
-      _mapController?.dispose();
       _mapController = null;
       _collectionRequestsSubscription?.cancel();
-      _announcementSubscription?.cancel(); // Cancel announcement subscription
-      _driverLocationSubscription
-          ?.cancel(); // Cancel driver location subscription
-      LocationTrackingService.stopLocationTracking();
-
-      // Set user as offline when app closes
-      _setUserOffline();
+      _driverLocationSubscription?.cancel();
+      _announcementSubscription?.cancel();
+      _mapUpdateTimer?.cancel();
     } catch (e) {
       print('Error disposing map controller: $e');
     }

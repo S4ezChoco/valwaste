@@ -128,10 +128,25 @@ function closeSidebar() {
 
 async function signOut() {
   try {
-    // Firebase sign out will be implemented here
+    // Clear localStorage session data
+    localStorage.removeItem('valwaste_admin');
+    
+    // Sign out from Firebase if available
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+      await firebase.auth().signOut();
+    }
+    
+    // Clear any other session storage
+    sessionStorage.clear();
+    
+    // Redirect to login page
     window.location.href = 'login.php';
   } catch (error) {
     console.error('Sign out error:', error);
+    // Even if Firebase signout fails, clear local session and redirect
+    localStorage.removeItem('valwaste_admin');
+    sessionStorage.clear();
+    window.location.href = 'login.php';
   }
 }
 

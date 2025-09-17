@@ -268,7 +268,7 @@ class _ResidentDashboardScreenState extends State<ResidentDashboardScreen>
                   crossAxisCount: 2,
                   crossAxisSpacing: AppSizes.paddingMedium,
                   mainAxisSpacing: AppSizes.paddingMedium,
-                  childAspectRatio: 1.2,
+                  childAspectRatio: 1.0,
                   children: [
                     _ActionCard(
                       icon: Icons.add_circle_outline,
