@@ -31,14 +31,16 @@ class _HomeScreenState extends State<HomeScreen> {
   late PageController _pageController;
   List<Widget> _screens = [];
   bool _isLoading = true;
+  List<BottomNavigationBarItem>? _cachedNavItems; // Cache navigation items
   final AnnouncementNotificationService _announcementService =
       AnnouncementNotificationService();
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
+    // Initialize immediately instead of using callback
     _initializeScreens();
-    _pageController = PageController(initialPage: _currentIndex);
 
     // Start listening for announcements after a short delay
     Future.delayed(const Duration(seconds: 2), () {
@@ -105,10 +107,11 @@ class _HomeScreenState extends State<HomeScreen> {
         break;
       case UserRole.barangayOfficial:
         print('HomeScreen: Initializing Barangay Official dashboard');
-        // Barangay Official features: Home, Approval, Maps, Profile
+        // Barangay Official features: Home, Approval, Schedule, Maps, Profile
         _screens = [
           const BarangayOfficialDashboardScreen(),
           const ApprovalScreen(), // New approval screen for managing requests
+          const ScheduleScreen(), // Schedule tab for viewing collection schedules
           const MapScreen(), // Maps tab
           const ProfileScreen(),
         ];
@@ -142,28 +145,42 @@ class _HomeScreenState extends State<HomeScreen> {
           const MapScreen(), // Maps tab
           const ProfileScreen(),
         ];
-        break;
-      default:
-        print('HomeScreen: Unknown role, using Resident screens');
-        _screens = [
-          const ResidentDashboardScreen(),
-          const ScheduleScreen(), // Schedule tab
-          const MapScreen(), // Maps tab
-          const ProfileScreen(),
-        ];
-        break;
     }
     print('HomeScreen: Screens initialized with ${_screens.length} screens');
 
     setState(() {
       _isLoading = false;
+      // Cache navigation items for this role
+      _cachedNavItems = _getBottomNavItems();
+      // Reset currentIndex if it's out of bounds for the new screen set
+      if (_currentIndex >= _screens.length) {
+        _currentIndex = 0;
+        print('HomeScreen: Reset currentIndex to 0 due to screen count change');
+      }
     });
   }
 
   void _onTabTapped(int index) {
+    print('HomeScreen: Tab tapped - index: $index, screens count: ${_screens.length}');
+    
+    // Prevent index out of bounds
+    if (index >= _screens.length || index < 0) {
+      print('HomeScreen: Index out of bounds ($index), ignoring tap');
+      return;
+    }
+    
+    // Additional validation for barangay officials
+    final currentUser = FirebaseAuthService.currentUser;
+    if (currentUser?.role == UserRole.barangayOfficial && _screens.length != 5) {
+      print('HomeScreen: Barangay official should have 5 screens, currently has ${_screens.length}. Re-initializing...');
+      _initializeScreens();
+      return;
+    }
+    
     setState(() {
       _currentIndex = index;
     });
+    
     _pageController.animateToPage(
       index,
       duration: const Duration(milliseconds: 300),
@@ -175,12 +192,31 @@ class _HomeScreenState extends State<HomeScreen> {
     final currentUser = FirebaseAuthService.currentUser;
     if (currentUser == null) return false;
 
-    // Map is at index 0 for driver, index 2 for other roles including resident
+    // Map is at different index for different roles
     if (currentUser.role == UserRole.driver) {
-      return _currentIndex == 0; // Map is still the first tab for driver
+      return _currentIndex == 0; // Map is the first tab for driver
+    } else if (currentUser.role == UserRole.barangayOfficial) {
+      return _currentIndex == 3; // Map is at index 3 for barangay official (Home, Approval, Schedule, Maps, Profile)
     }
-    return _currentIndex ==
-        2; // Map is at index 2 for other roles including resident
+    return _currentIndex == 2; // Map is at index 2 for resident (Home, Schedule, Maps, Profile)
+  }
+
+  int _getExpectedTabCount() {
+    final currentUser = FirebaseAuthService.currentUser;
+    if (currentUser == null) return 4; // Default
+    
+    switch (currentUser.role) {
+      case UserRole.resident:
+        return 4; // Home, Schedule, Maps, Profile
+      case UserRole.barangayOfficial:
+        return 5; // Home, Approval, Schedule, Maps, Profile
+      case UserRole.driver:
+        return 4; // Maps, Collections, Reports, Profile
+      case UserRole.collector:
+        return 4; // Home, Report, Maps, Profile
+      case UserRole.administrator:
+        return 4; // Home, Report, Maps, Profile
+    }
   }
 
   List<BottomNavigationBarItem> _getBottomNavItems() {
@@ -189,6 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'HomeScreen: Getting bottom nav items for user: ${currentUser?.email ?? 'null'}',
     );
     print('HomeScreen: User role: ${currentUser?.roleString ?? 'null'}');
+    print('HomeScreen: Expected tab count: ${_getExpectedTabCount()}');
 
     if (currentUser == null) {
       print('HomeScreen: No current user, returning default nav items');
@@ -221,7 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ];
       case UserRole.barangayOfficial:
-        print('HomeScreen: Returning Barangay Official nav items (4 items)');
+        print('HomeScreen: Returning Barangay Official nav items (5 items)');
         return [
           const BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
@@ -232,6 +269,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.approval_outlined),
             activeIcon: Icon(Icons.approval),
             label: 'Approvals',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_today_outlined),
+            activeIcon: Icon(Icons.calendar_today),
+            label: 'Schedule',
           ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.map_outlined),
@@ -316,9 +358,6 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Profile',
           ),
         ];
-      default:
-        print('HomeScreen: Unknown role, returning default nav items');
-        return _getDefaultNavItems();
     }
   }
 
@@ -355,6 +394,26 @@ class _HomeScreenState extends State<HomeScreen> {
     print('HomeScreen build: User role: ${currentUser?.roleString ?? 'null'}');
     print('HomeScreen build: Screens count: ${_screens.length}');
     print('HomeScreen build: Current index: $_currentIndex');
+    
+    // Ensure currentIndex is within bounds
+    if (_currentIndex >= _screens.length && _screens.isNotEmpty) {
+      print('HomeScreen build: Fixing out of bounds index');
+      _currentIndex = 0;
+    }
+    
+    // Simple validation and use cached navigation items
+    final bottomNavItems = _cachedNavItems ?? _getBottomNavItems();
+    
+    print('HomeScreen build: Screens: ${_screens.length}, NavItems: ${bottomNavItems.length}');
+    
+    // Simple bounds check
+    if (_screens.isNotEmpty && bottomNavItems.isNotEmpty) {
+      final maxIndex = _screens.length - 1;
+      if (_currentIndex > maxIndex) {
+        print('HomeScreen build: Index out of bounds, resetting to 0');
+        _currentIndex = 0;
+      }
+    }
 
     if (_isLoading || _screens.isEmpty) {
       return Scaffold(
@@ -413,7 +472,7 @@ class _HomeScreenState extends State<HomeScreen> {
         unselectedItemColor: Colors.white.withOpacity(0.7),
         backgroundColor: AppColors.primary,
         elevation: 8,
-        items: _getBottomNavItems(),
+        items: bottomNavItems, // Use cached items to ensure consistency
       ),
     );
   }
