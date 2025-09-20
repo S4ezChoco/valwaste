@@ -193,14 +193,13 @@ class AdvancedSchedulingService {
         0,
       );
 
-      // Use user-selected priority or calculate based on waste type and urgency
-      final wasteTypeString = wasteType.toString().split('.').last;
-      final basePriority = _wasteTypePriority[wasteTypeString] ?? 5;
-      final calculatedPriority = isUrgent ? basePriority - 1 : basePriority;
-
-      // Convert priority string to number if provided
-      int finalPriority = calculatedPriority;
+      // Priority logic: User-selected priority takes precedence, then urgency, then waste type
+      int finalPriority;
+      String finalPriorityText;
+      
       if (priority != null) {
+        // User explicitly selected a priority - use it
+        finalPriorityText = priority;
         switch (priority.toLowerCase()) {
           case 'high':
             finalPriority = 1;
@@ -211,7 +210,28 @@ class AdvancedSchedulingService {
           case 'low':
             finalPriority = 5;
             break;
+          default:
+            finalPriority = 3;
+            finalPriorityText = 'Medium';
         }
+      } else {
+        // No user priority - calculate based on urgency and waste type
+        final wasteTypeString = wasteType.toString().split('.').last;
+        final basePriority = _wasteTypePriority[wasteTypeString] ?? 5;
+        
+        if (isUrgent) {
+          finalPriority = 1; // Urgent always gets highest priority
+          finalPriorityText = 'High';
+        } else {
+          finalPriority = basePriority;
+          finalPriorityText = basePriority <= 2 ? 'High' : (basePriority <= 3 ? 'Medium' : 'Low');
+        }
+      }
+      
+      // If urgent is toggled, always override to High priority regardless of user selection
+      if (isUrgent) {
+        finalPriority = 1;
+        finalPriorityText = 'High';
       }
 
       final currentUserId = FirebaseAuthService.currentUser!.id;
@@ -240,7 +260,7 @@ class AdvancedSchedulingService {
       collectionData['barangay'] = barangay;
       collectionData['time_slot'] = scheduledTimeSlot;
       collectionData['priority'] = finalPriority;
-      collectionData['priority_text'] = priority ?? 'Medium';
+      collectionData['priority_text'] = finalPriorityText;
       collectionData['category'] = category ?? 'Collection Request';
       collectionData['is_urgent'] = isUrgent;
       collectionData['alternative_dates'] = alternativeDates ?? [];

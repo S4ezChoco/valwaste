@@ -879,9 +879,12 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
                 Container(
                   padding: const EdgeInsets.all(AppSizes.paddingMedium),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: _isUrgent ? Colors.red.withOpacity(0.05) : AppColors.surface,
                     borderRadius: BorderRadius.circular(AppSizes.radiusMedium),
-                    border: Border.all(color: AppColors.divider),
+                    border: Border.all(
+                      color: _isUrgent ? Colors.red.withOpacity(0.3) : AppColors.divider,
+                      width: _isUrgent ? 2 : 1,
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -905,9 +908,12 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
                               ),
                             ),
                             Text(
-                              'Mark as urgent for priority scheduling',
+                              _isUrgent 
+                                  ? 'Priority automatically set to High'
+                                  : 'Mark as urgent for priority scheduling',
                               style: AppTextStyles.body2.copyWith(
-                                color: AppColors.textSecondary,
+                                color: _isUrgent ? Colors.red.shade600 : AppColors.textSecondary,
+                                fontWeight: _isUrgent ? FontWeight.w600 : FontWeight.normal,
                               ),
                             ),
                           ],
@@ -918,6 +924,10 @@ class _CollectionRequestScreenState extends State<CollectionRequestScreen> {
                         onChanged: (value) {
                           setState(() {
                             _isUrgent = value;
+                            // When urgent is toggled ON, automatically set priority to High
+                            if (_isUrgent) {
+                              _selectedPriority = 'High';
+                            }
                           });
                         },
                         activeColor: Colors.red,

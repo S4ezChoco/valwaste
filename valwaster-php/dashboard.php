@@ -1966,6 +1966,45 @@
             }
         }
         
+        // Function to update critical issues count
+        async function updateCriticalIssuesCount() {
+            try {
+                const collectionsSnapshot = await db.collection('collections').get();
+                let criticalIssues = 0;
+                
+                collectionsSnapshot.forEach(doc => {
+                    const report = doc.data();
+                    // Count urgent collections that are approved (critical issues that need immediate attention)
+                    // Only count approved urgent requests since they need to be approved by barangay officials first
+                    if (report.is_urgent === true && report.status === 'approved') {
+                        criticalIssues++;
+                        console.log('Found critical issue:', {
+                            id: doc.id,
+                            is_urgent: report.is_urgent,
+                            status: report.status,
+                            priority_text: report.priority_text,
+                            address: report.address
+                        });
+                    }
+                });
+                
+                document.getElementById('criticalIssues').textContent = criticalIssues;
+                console.log('Critical issues count updated:', criticalIssues);
+                
+                // Update the color based on critical issues count
+                const criticalElement = document.getElementById('criticalIssues');
+                if (criticalIssues > 0) {
+                    criticalElement.style.color = '#ef4444'; // Red for critical issues
+                } else {
+                    criticalElement.style.color = '#10b981'; // Green for no critical issues
+                }
+                
+            } catch (error) {
+                console.error('Error counting critical issues:', error);
+                document.getElementById('criticalIssues').textContent = '0';
+            }
+        }
+        
         // Function to view report details (redirect to report management)
         function viewReportDetails(reportId) {
             window.location.href = `report-management.php?reportId=${reportId}`;
@@ -1981,6 +2020,7 @@
             setTimeout(() => {
                 loadRecentReports(); // Load recent pending reports
                 updateTotalReportsCount(); // Update total reports count
+                updateCriticalIssuesCount(); // Update critical issues count
             }, 1000);
             
             // Setup toggle button event listener
@@ -1996,6 +2036,7 @@
             setInterval(() => {
                 loadRecentReports();
                 updateTotalReportsCount();
+                updateCriticalIssuesCount();
             }, 30000);
         });
     </script>
