@@ -40,12 +40,14 @@ class LocationTrackingService {
       _isTracking = true;
       print('Starting location tracking for user: ${currentUser.email}');
 
-      // Start position stream with 10-second interval
+      // Start position stream with more frequent updates for drivers
+      final isDriver = currentUser.role == UserRole.driver;
       _positionStream =
           Geolocator.getPositionStream(
-            locationSettings: const LocationSettings(
+            locationSettings: LocationSettings(
               accuracy: LocationAccuracy.high,
-              distanceFilter: 10, // Update when user moves 10 meters
+              distanceFilter: isDriver ? 5 : 10, // Drivers: 5m, Others: 10m
+              timeLimit: const Duration(seconds: 30),
             ),
           ).listen(
             (Position position) {
@@ -55,6 +57,20 @@ class LocationTrackingService {
               print('Location tracking error: $error');
             },
           );
+
+      // Add timer-based updates for drivers to ensure frequent updates
+      if (isDriver) {
+        _locationTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+          try {
+            final position = await getCurrentLocation();
+            if (position != null) {
+              _updateUserLocation(currentUser, position);
+            }
+          } catch (e) {
+            print('Timer-based location update error: $e');
+          }
+        });
+      }
     } catch (e) {
       print('Error starting location tracking: $e');
       _isTracking = false;

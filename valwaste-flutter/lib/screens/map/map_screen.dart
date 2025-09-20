@@ -699,13 +699,29 @@ class _MapScreenState extends State<MapScreen>
               heroTag: "requests",
             ),
           const SizedBox(height: 8),
-          // User locations toggle button
+          // User locations toggle button (shows different icon for residents)
           _buildFloatingButton(
-            icon: _showUserLocations ? Icons.people : Icons.people_outline,
+            icon: FirebaseAuthService.currentUser?.role == UserRole.resident
+                ? (_showUserLocations ? Icons.person : Icons.person_outline)
+                : (_showUserLocations ? Icons.people : Icons.people_outline),
             onPressed: () {
               setState(() {
                 _showUserLocations = !_showUserLocations;
               });
+              
+              // Show appropriate message based on user role
+              final currentUser = FirebaseAuthService.currentUser;
+              if (currentUser?.role == UserRole.resident) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(_showUserLocations 
+                        ? 'Your location is now visible on the map' 
+                        : 'Your location is now hidden from the map'),
+                    backgroundColor: _showUserLocations ? Colors.green : Colors.orange,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
             },
             isActive: _showUserLocations,
             heroTag: "user_locations",
@@ -931,6 +947,15 @@ class _MapScreenState extends State<MapScreen>
             // Also try to get initial driver location
             print('🔧 Getting initial driver location...');
             _getInitialDriverLocation(assignedDriverId);
+
+            // Auto-navigate to driver for residents when driver is assigned
+            final currentUser = FirebaseAuthService.currentUser;
+            if (currentUser?.role == UserRole.resident) {
+              // Delay to allow driver location to be set first
+              Future.delayed(Duration(seconds: 2), () {
+                _autoNavigateToDriver();
+              });
+            }
           }
         }
       } else {
@@ -1039,6 +1064,13 @@ class _MapScreenState extends State<MapScreen>
                 // Update estimated arrival when driver location changes
                 if (_assignedDriverInfo != null && _currentLocation != null) {
                   _updateEstimatedArrival();
+                }
+
+                // Auto-navigate to driver for residents when location updates
+                final currentUser = FirebaseAuthService.currentUser;
+                if (currentUser?.role == UserRole.resident && _currentLocation != null) {
+                  // Only auto-navigate if this is the first location update or significant movement
+                  _autoNavigateToDriver();
                 }
               });
             } else {
@@ -1162,6 +1194,53 @@ class _MapScreenState extends State<MapScreen>
           content: Text('Driver location not available yet'),
           backgroundColor: Colors.orange,
           duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  /// Auto-navigate to driver when they accept request (for residents)
+  void _autoNavigateToDriver() {
+    final currentUser = FirebaseAuthService.currentUser;
+    if (currentUser?.role == UserRole.resident && _driverLocation != null && _mapController != null) {
+      // Show both driver and resident locations
+      if (_currentLocation != null) {
+        // Calculate center point between driver and resident
+        final centerLat = (_driverLocation!.latitude + _currentLocation!.latitude) / 2;
+        final centerLng = (_driverLocation!.longitude + _currentLocation!.longitude) / 2;
+        final centerPoint = LatLng(centerLat, centerLng);
+        
+        // Calculate appropriate zoom level based on distance
+        final distance = _calculateDistance(
+          _driverLocation!.latitude,
+          _driverLocation!.longitude,
+          _currentLocation!.latitude,
+          _currentLocation!.longitude,
+        );
+        
+        // Adjust zoom based on distance (closer = higher zoom)
+        double zoom = 15.0;
+        if (distance < 1) {
+          zoom = 16.0; // Very close
+        } else if (distance < 5) {
+          zoom = 14.0; // Close
+        } else if (distance < 10) {
+          zoom = 13.0; // Medium distance
+        } else {
+          zoom = 12.0; // Far distance
+        }
+        
+        _mapController!.move(centerPoint, zoom);
+      } else {
+        // Just focus on driver
+        _mapController!.move(_driverLocation!, 15.0);
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Your driver is on the way! 🚛'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
         ),
       );
     }
@@ -3449,14 +3528,33 @@ class _MapScreenState extends State<MapScreen>
       final userRole = userLocation['userRole'] as String?;
       final userId = userLocation['userId'] as String?;
 
-      // Skip current user's own location
-      if (userId == currentUser?.id) continue;
+      // For residents: Only show their own location and assigned drivers
+      if (currentUser?.role == UserRole.resident) {
+        // Show only current user's own location
+        if (userId != currentUser?.id) {
+          // Also show assigned driver if available
+          if (userRole == 'Driver' && _assignedDriverInfo != null && _assignedDriverInfo!['id'] == userId) {
+            // This is the assigned driver, show them
+          } else {
+            // Skip all other users (including other residents)
+            continue;
+          }
+        }
+      } else {
+        // For non-residents: Skip current user's own location but show others
+        if (userId == currentUser?.id) continue;
+      }
 
       // Only show residents and drivers
       if (userRole != 'Resident' && userRole != 'Driver') continue;
 
       final coords = LatLng(latitude, longitude);
       final isDriver = userRole == 'Driver';
+      
+      // Check if driver is recently active (within last 2 minutes)
+      final lastUpdated = location['lastUpdated'] as String?;
+      final isRecentlyActive = lastUpdated != null && 
+          DateTime.now().difference(DateTime.parse(lastUpdated)).inMinutes < 2;
 
       markers.add(
         Marker(
@@ -3467,27 +3565,32 @@ class _MapScreenState extends State<MapScreen>
             onTap: () {
               _showUserLocationInfo(userLocation);
             },
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
               decoration: BoxDecoration(
                 color: isDriver
-                    ? Colors.green.withValues(alpha: 0.9)
+                    ? (isRecentlyActive ? Colors.green.withValues(alpha: 0.9) : Colors.orange.withValues(alpha: 0.9))
                     : Colors.blue.withValues(alpha: 0.9),
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
                 boxShadow: [
                   BoxShadow(
-                    color: (isDriver ? Colors.green : Colors.blue).withValues(
-                      alpha: 0.3,
-                    ),
-                    blurRadius: 8,
+                    color: (isDriver 
+                        ? (isRecentlyActive ? Colors.green : Colors.orange)
+                        : Colors.blue).withValues(alpha: 0.3),
+                    blurRadius: isDriver && isRecentlyActive ? 12 : 8,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              child: Icon(
-                isDriver ? Icons.local_shipping : Icons.person,
-                color: Colors.white,
-                size: 20,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: Icon(
+                  key: ValueKey('${userId}_${isDriver ? 'truck' : 'person'}_${isRecentlyActive}'),
+                  isDriver ? Icons.local_shipping : Icons.person,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
           ),

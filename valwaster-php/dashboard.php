@@ -98,15 +98,74 @@
             justify-content: center;
             color: white;
             font-weight: bold;
-            font-size: 12px;
+            position: relative;
+            transition: filter 0.3s ease, box-shadow 0.3s ease;
+            transform-origin: center center;
+            will-change: filter, box-shadow;
+        }
+        
+        .driver-marker.online {
+            background: #10B981;
+            animation: pulse-online 2s infinite;
+        }
+        
+        .driver-marker.offline {
+            background: #6B7280;
+        }
+        
+        .driver-marker.active-moving {
+            background: #059669;
+            box-shadow: 0 0 20px rgba(5, 150, 105, 0.6);
+            animation: pulse-active 1s infinite;
+        }
+        
+        .truck-icon {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .truck-icon.moving {
+            animation: truck-bounce 1.2s ease-in-out infinite;
+        }
+        
+        .movement-indicator {
             position: absolute;
-            transform: translate(-50%, -50%);
-            pointer-events: auto;
+            top: -2px;
+            right: -2px;
+            width: 8px;
+            height: 8px;
+            background: #FFF;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes pulse-online {
+            0% { box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+            50% { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4); }
+            100% { box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        }
+        
+        @keyframes pulse-active {
+            0% { box-shadow: 0 0 20px rgba(5, 150, 105, 0.6); }
+            50% { box-shadow: 0 0 25px rgba(5, 150, 105, 0.8); }
+            100% { box-shadow: 0 0 20px rgba(5, 150, 105, 0.6); }
+        }
+        
+        @keyframes truck-bounce {
+            0%, 100% { transform: translateY(0px) translateX(0px); }
+            50% { transform: translateY(-1px) translateX(0px); }
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
         }
         
         .driver-marker:hover {
-            transform: translate(-50%, -50%) scale(1.1);
-            transition: transform 0.1s ease;
+            filter: brightness(1.1);
+            transition: filter 0.2s ease;
         }
         
         .driver-marker.online {
@@ -627,15 +686,60 @@
             });
         }
         
-        // Load driver locations from Firebase
+        // Load driver locations from Firebase real-time collection
         function loadDriverLocations() {
-            console.log('Loading driver locations from Firebase...');
+            console.log('Loading driver locations from Firebase real-time collection...');
             console.log('isDriversVisible:', isDriversVisible);
             
             if (!isDriversVisible) {
                 console.log('Drivers not visible, skipping load');
                 return;
             }
+            
+            // Use real-time user_locations collection for live tracking
+            db.collection('user_locations')
+                .where('userRole', '==', 'Driver')
+                .where('isOnline', '==', true)
+                .onSnapshot((snapshot) => {
+                    console.log('Found real-time driver locations:', snapshot.size);
+                    const driverLocations = [];
+                    
+                    snapshot.forEach((doc) => {
+                        const userData = doc.data();
+                        console.log('Processing real-time driver:', userData.userName, userData);
+                        
+                        // Check if driver has location object with latitude and longitude
+                        if (userData.location && userData.location.latitude && userData.location.longitude) {
+                            console.log('Driver has real-time coordinates:', userData.location.latitude, userData.location.longitude);
+                            driverLocations.push({ 
+                                id: doc.id, 
+                                userId: userData.userId,
+                                firstName: userData.userName ? userData.userName.split(' ')[0] : 'Driver',
+                                lastName: userData.userName ? userData.userName.split(' ').slice(1).join(' ') : '',
+                                email: userData.userEmail,
+                                role: userData.userRole,
+                                barangay: userData.barangay,
+                                location: userData.location,
+                                isOnline: userData.isOnline,
+                                lastSeen: userData.lastSeen
+                            });
+                        } else {
+                            console.log('Driver missing coordinates:', userData.userName);
+                        }
+                    });
+                    
+                    console.log('Filtered real-time driver locations:', driverLocations.length, driverLocations);
+                    addDriverMarkers(driverLocations);
+                }, (error) => {
+                    console.error('Error loading real-time driver locations:', error);
+                    // Fallback to static user collection
+                    loadDriverLocationsStatic();
+                });
+        }
+        
+        // Fallback function for static driver locations
+        function loadDriverLocationsStatic() {
+            console.log('Loading driver locations from static users collection...');
             
             // Get all users and filter locally to handle different role formats
             db.collection('users').get().then((snapshot) => {
@@ -697,22 +801,29 @@
                     const el = document.createElement('div');
                     el.className = 'driver-marker';
                     
-                    // Determine if driver is online (last update within 5 minutes)
+                    // Determine if driver is online (last update within 2 minutes for real-time)
                     const now = new Date();
                     const lastUpdate = driver.location.lastUpdated ? new Date(driver.location.lastUpdated) : new Date(0);
                     const timeDiff = (now - lastUpdate) / (1000 * 60); // minutes
-                    const isOnline = timeDiff <= 5;
+                    const isOnline = timeDiff <= 2; // More strict for real-time tracking
+                    const isRecentlyActive = timeDiff <= 0.5; // Within 30 seconds
                     
                     el.classList.add(isOnline ? 'online' : 'offline');
+                    if (isRecentlyActive) {
+                        el.classList.add('active-moving');
+                    }
                     
-                    // Use truck icon instead of letter (matching Flutter app)
+                    // Use animated truck icon with movement indicator
                     el.innerHTML = `
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="1" y="3" width="15" height="13"></rect>
-                            <polygon points="16,8 20,8 23,11 23,16 16,16 16,8"></polygon>
-                            <circle cx="5.5" cy="18.5" r="2.5"></circle>
-                            <circle cx="18.5" cy="18.5" r="2.5"></circle>
-                        </svg>
+                        <div class="truck-icon ${isRecentlyActive ? 'moving' : ''}">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="1" y="3" width="15" height="13"></rect>
+                                <polygon points="16,8 20,8 23,11 23,16 16,16 16,8"></polygon>
+                                <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                            </svg>
+                            ${isRecentlyActive ? '<div class="movement-indicator"></div>' : ''}
+                        </div>
                     `;
                     
                     console.log('Creating marker for driver with truck icon:', isOnline ? 'online' : 'offline');
@@ -755,8 +866,8 @@
                             element: el,
                             anchor: 'center',
                             offset: [0, 0],
-                            pitchAlignment: 'map',
-                            rotationAlignment: 'map'
+                            pitchAlignment: 'viewport',
+                            rotationAlignment: 'viewport'
                         })
                             .setLngLat([driver.location.longitude, driver.location.latitude])
                             .setPopup(popup)

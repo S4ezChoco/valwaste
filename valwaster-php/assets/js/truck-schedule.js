@@ -30,7 +30,6 @@ let selectedCollectors = [];
 let schedules = [];
 let allDrivers = [];
 let allCollectors = [];
-let currentBarangayFilter = null;
 
 // Month names
 const monthNames = [
@@ -177,32 +176,22 @@ function loadDrivers() {
     });
 }
 
-// Render drivers based on current filter
+// Render all drivers without filtering
 function renderDrivers() {
     const driverMenu = document.getElementById('driver-dropdown-menu');
     driverMenu.innerHTML = '';
     
-    // Filter drivers based on current barangay filter
-    let driversToShow = allDrivers;
-    if (currentBarangayFilter) {
-        driversToShow = allDrivers.filter(driver => 
-            driver.barangay === currentBarangayFilter
-        );
-    }
-    
-    if (driversToShow.length === 0) {
+    if (allDrivers.length === 0) {
         const emptyItem = document.createElement('div');
         emptyItem.className = 'dropdown-item';
         emptyItem.style.color = '#6b7280';
         emptyItem.style.fontStyle = 'italic';
-        emptyItem.innerHTML = currentBarangayFilter ? 
-            `No drivers in ${currentBarangayFilter}` : 
-            'No drivers available';
+        emptyItem.innerHTML = 'No drivers available';
         driverMenu.appendChild(emptyItem);
         return;
     }
     
-    driversToShow.forEach((driver) => {
+    allDrivers.forEach((driver) => {
         const driverItem = document.createElement('div');
         driverItem.className = 'dropdown-item';
         driverItem.innerHTML = `
@@ -538,7 +527,6 @@ function resetForm() {
     selectedDriverData = null;
     selectedCollectors = [];
     selectedLocation = null;
-    currentBarangayFilter = null;
     
     // Reset display texts
     document.getElementById('driver-selected-text').textContent = 'Select driver';
@@ -573,7 +561,7 @@ function resetForm() {
         checklist.innerHTML = '';
     }
     
-    // Re-render drivers and collectors without filter
+    // Re-render drivers and collectors
     renderDrivers();
     renderCollectors();
     
@@ -648,29 +636,6 @@ function selectDriver(driverId, driverName, driverData) {
     document.getElementById('driver-selected-text').textContent = driverName;
     document.getElementById('selected-driver').value = driverId;
     closeAllDropdowns();
-    
-    // If driver has a barangay, apply filter and pin location
-    if (driverData && driverData.barangay) {
-        console.log('Driver selected with barangay:', driverData.barangay);
-        
-        // Set the barangay filter
-        currentBarangayFilter = driverData.barangay;
-        
-        // Re-render drivers and collectors with the new filter
-        renderDrivers();
-        renderCollectors();
-        
-        // Don't clear selected collectors for static list - they work across all barangays
-        // selectedCollectors = selectedCollectors.filter(c => c.barangay === driverData.barangay);
-        updateCollectorsDisplay();
-        
-        // No longer pin barangay on map - only approved requests show pins
-        
-        // Show notification
-        if (window.showInfo) {
-            window.showInfo(`Filtered to ${driverData.barangay} barangay`);
-        }
-    }
 }
 
 function toggleCollector(collectorId, collectorName, collectorData) {
@@ -873,7 +838,6 @@ function initLocationMap() {
         }
     }
 }
-
 
 // Search streets function
 function searchStreets() {
@@ -1088,42 +1052,8 @@ function displayStreetsChecklist(streets) {
 }
 
 function handleStreetSelection(streetObj, isChecked) {
-    // Removed map pin functionality - streets are now just for reference
-    if (isChecked) {
-        // Apply barangay filter based on selected street
-        const streetBarangay = streetObj.barangay || extractBarangayFromStreet(streetObj.display);
-        
-        if (streetBarangay) {
-            currentBarangayFilter = streetBarangay;
-            
-            // Clear selected driver if it's from a different barangay
-            if (selectedDriverData && selectedDriverData.barangay && selectedDriverData.barangay !== streetBarangay) {
-                selectedDriverId = null;
-                selectedDriverData = null;
-                document.getElementById('driver-selected-text').textContent = 'Select driver';
-                document.getElementById('selected-driver').value = '';
-            }
-            
-            // Don't clear selected collectors for static list - they work across all barangays
-            // selectedCollectors = selectedCollectors.filter(c => c.barangay === streetBarangay);
-            updateCollectorsDisplay();
-            
-            // Re-render drivers and collectors with the new filter
-            renderDrivers();
-            renderCollectors();
-            
-            // Show notification
-            showInfo(`Filtered to ${streetBarangay} barangay`);
-        }
-    } else {
-        // If no more streets are selected, clear the barangay filter
-        currentBarangayFilter = null;
-        renderDrivers();
-        renderCollectors();
-        
-        // Show notification
-        showInfo('Filter cleared - showing all personnel');
-    }
+    // Streets are now just for reference - no filtering applied
+    console.log('Street selected:', streetObj.display, 'Checked:', isChecked);
 }
 
 function updateCoordinatesDisplay() {
