@@ -429,6 +429,7 @@ async function loadCollectionApprovalReports() {
                 location: locationDisplay,
                 reportedBy: userName,
                 priority: getCollectionPriority(collectionData),
+                isUrgent: collectionData.is_urgent === true,
                 category: reportCategory,
                 date: collectionData.created_at || collectionData.approved_at,
                 status: reportStatus,
@@ -497,6 +498,24 @@ async function loadCollectionApprovalReports() {
 
 // Get priority based on collection data
 function getCollectionPriority(collectionData) {
+    // First check if user explicitly set priority_text (from Flutter app)
+    if (collectionData.priority_text) {
+        return collectionData.priority_text;
+    }
+    
+    // Check if it's marked as urgent
+    if (collectionData.is_urgent === true) {
+        return 'High';
+    }
+    
+    // Check numeric priority field
+    if (collectionData.priority !== undefined) {
+        if (collectionData.priority <= 1) return 'High';
+        if (collectionData.priority <= 3) return 'Medium';
+        return 'Low';
+    }
+    
+    // Fallback to old logic based on waste type and quantity
     const wasteType = collectionData.waste_type;
     const quantity = parseFloat(collectionData.quantity) || 0;
     
@@ -653,7 +672,7 @@ function displayReports() {
                 <td>${report.title}</td>
                 <td>${report.location}</td>
                 <td>${report.reportedBy}</td>
-                <td><span class="priority-badge priority-${report.priority.toLowerCase()}">${report.priority}</span></td>
+                <td><span class="priority-badge priority-${report.priority.toLowerCase()}">${report.priority}${report.isUrgent ? ' 🚨' : ''}</span></td>
                 <td><span class="category-badge">${report.category}</span></td>
                 <td>${formatDate(report.date)}</td>
                 <td class="col-actions">
@@ -726,7 +745,7 @@ function viewReport(reportId) {
     document.getElementById('detail-location').textContent = report.location;
     document.getElementById('detail-reporter').textContent = report.reportedBy;
     document.getElementById('detail-date').textContent = formatDate(report.date);
-    document.getElementById('detail-priority').innerHTML = `<span class="priority-badge priority-${report.priority.toLowerCase()}">${report.priority}</span>`;
+    document.getElementById('detail-priority').innerHTML = `<span class="priority-badge priority-${report.priority.toLowerCase()}">${report.priority}${report.isUrgent ? ' 🚨 URGENT' : ''}</span>`;
     document.getElementById('detail-category').innerHTML = `<span class="category-badge">${report.category}</span>`;
     document.getElementById('detail-status').textContent = report.status;
     document.getElementById('detail-description').textContent = report.description || 'No description provided.';
@@ -1359,7 +1378,7 @@ async function updateCollectionStatusInFirebase(collectionId, targetStatus) {
         let firebaseStatus;
         switch (targetStatus) {
             case 'resolved':
-                firebaseStatus = 'completed';
+                firebaseStatus = 'approved'; // Changed from 'completed' to 'approved' for critical issues counter
                 break;
             case 'unresolved':
                 firebaseStatus = 'cancelled';
